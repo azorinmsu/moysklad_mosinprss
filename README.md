@@ -40,4 +40,4 @@
 Authorization: Basic <base64(login:password)>
 ```
 
-**Стек приложения**: Java, Spring Framework, Hibernate, PostgreSQL, Docker, TestContainers, JUnit 5
+**Стек приложения**: Java, Spring Framework, Hibernate, PostgreSQL, Docker, TestContainers, JUnit 5, Maven
