@@ -3,11 +3,15 @@ package ru.moysklad.intern.entity;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = @Index(columnList = "name"))
 public class Product {
+    public Product() {}
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -21,19 +25,45 @@ public class Product {
 
     @Column(name = "description", nullable = true)
     private String description;
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     // unit of measurement
-    @Column(name = "uom")
-    private String uomId = "BASE";
-
-    // TODO: узнать насчет того, как подтягивать величины
+    // на будущее как парсить json-объект:
+    // ID: obj["rows"][INDEX]["id"] | имя: obj["rows"][INDEX]["name"]
+    // todo: с индексом подумать, поскольку нужно получить ту самую UOM и сохранить ее ID
+    @Column(name = "uom", nullable = false)
+    private UUID uomId;
+    public UUID getUomId() { return uomId; }
+    public void setUomId(UUID uomId) { this.uomId = uomId; }
 
     // пример: 10.000.000.000.000.000,00 - то есть
     // десять квадраллионов и 0 копеек
-    // в 10 раз меньше, чем долг гугла перед Россией
     @Column(name = "price", precision = 19, scale = 2)
     private BigDecimal price;
+    public BigDecimal getPrice() { return price; }
+    public void setPrice(BigDecimal price) { this.price = price; } // note: строку цены обработать в DTO и перенести его в BD формат
 
     @Column(name = "archived")
-    private Boolean archived = false; // as default
+    private boolean archived = false; // as default
+    public boolean getArchived() { return archived; }
+    public void setArchived(boolean status) { this.archived = status; }
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Modifier> modifiers = new ArrayList<>();
+    // honestly idk is there a reason to use them there?
+    public List<Modifier> getModifiers() { return modifiers; }
+    public void setModifiers(List<Modifier> list) { this.modifiers = list; }
+
+    // additional methods for connecting products and modifiers
+    public void addModifier(Modifier modifier) {
+        modifiers.add(modifier);
+        modifier.setProduct(this);
+    }
+    public void removeModifier(Modifier modifier) {
+        modifiers.remove(modifier);
+        modifier.setProduct(null);
+    }
+
+    // Maybe I will do logic for updating modifiers. Maybe.
 }
