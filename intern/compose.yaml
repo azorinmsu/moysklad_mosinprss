@@ -2,6 +2,7 @@ services:
   db:
     container_name: intern_db
     image: 'postgres:18-alpine'
+    restart: on-failure
     env_file:
       - .env
     environment:
@@ -10,7 +11,15 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
     ports:
       - '5432:5432'
-  #api:
-  #  container_name: api_server
-  #  ports:
-  #    - '8080:8080'
+    volumes:
+      - postgres-data:/var/lib/postgresql/docker
+  # DO NOT USE RIGHT NOW.
+  api:
+    container_name: api_server
+    restart: on-failure
+    build: .
+    ports:
+      - '8080:8080'
+
+volumes:
+  postgres-data:

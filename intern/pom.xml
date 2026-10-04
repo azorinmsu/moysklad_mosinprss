@@ -28,6 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>27</java.version>
+		<liquibase.version>4.27.0</liquibase.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -44,11 +45,14 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.liquibase.ext</groupId>
+			<artifactId>liquibase-hibernate7</artifactId>
+			<version>5.0.4</version>
+			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>
@@ -150,6 +154,31 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.liquibase</groupId>
+				<artifactId>liquibase-maven-plugin</artifactId>
+				<version>${liquibase.version}</version>
+
+				<configuration>
+					<propertyFile>src/main/resources/liquibase.properties</propertyFile>
+					<changeLogFile>src/main/resources/db/changelog/db.changelog-master.yaml</changeLogFile>
+					<outputChangeLogFile>src/main/resources/db/changelog/generated-changelog.yaml</outputChangeLogFile>
+				</configuration>
+
+				<dependencies>
+					<dependency>
+						<groupId>org.liquibase.ext</groupId>
+						<artifactId>liquibase-hibernate7</artifactId>
+						<version>5.0.4</version>
+					</dependency>
+
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-data-jpa</artifactId>
+						<version>${project.parent.version}</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>

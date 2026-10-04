@@ -11,6 +11,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "uom")
 public class UnitOfMeasurement {
+    public UnitOfMeasurement() {}
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -21,7 +25,7 @@ public class UnitOfMeasurement {
     public void setName(String name) { this.name = name; }
 
     // даже если тип удален, нужно ОСТАВИТЬ сам товар
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = false)
+    @OneToMany(mappedBy = "uom", cascade = CascadeType.ALL, orphanRemoval = false)
     // todo: доделать завтра все связи и смержить в бд
     private List<Product> products = new ArrayList<>();
     public List<Product> getProducts() { return products; }

@@ -1,3 +1,7 @@
-FROM ubuntu:latest
+FROM openjdk:27-ea-oraclelinux9
 
-ENTRYPOINT ["top", "-b"]
+ARG JAR_PACKAGE=target/*.jar
+
+COPY ${JAR_PACKAGE} app.jar
+
+CMD ["java", "-jar", "/app.jar"]
