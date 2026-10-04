@@ -1,6 +1,8 @@
 package ru.moysklad.intern.entity;
 
 import jakarta.persistence.*;
+import ru.moysklad.intern.entity.meta.Currency;
+import ru.moysklad.intern.entity.meta.UnitOfMeasurement;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -31,11 +33,17 @@ public class Product {
     // unit of measurement
     // на будущее как парсить json-объект:
     // ID: obj["rows"][INDEX]["id"] | имя: obj["rows"][INDEX]["name"]
-    // todo: с индексом подумать, поскольку нужно получить ту самую UOM и сохранить ее ID
-    @Column(name = "uom", nullable = false)
-    private UUID uomId;
-    public UUID getUomId() { return uomId; }
-    public void setUomId(UUID uomId) { this.uomId = uomId; }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "uom_id")
+    private UnitOfMeasurement uom;
+    public UnitOfMeasurement getUom() { return uom; }
+    public void setUom(UnitOfMeasurement uom) { this.uom = uom; }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "currency_id")
+    private Currency currency;
+    public Currency getCurrency() { return currency; }
+    public void setCurrency(Currency currency) { this.currency = currency; }
 
     // пример: 10.000.000.000.000.000,00 - то есть
     // десять квадраллионов и 0 копеек
