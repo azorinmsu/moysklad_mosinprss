@@ -1,8 +1,6 @@
-package ru.moysklad.intern.utils.auth;
+package ru.moysklad.intern.util.auth;
 
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
-import ru.moysklad.intern.config.Configuration;
 
 import java.util.Objects;
 
@@ -16,7 +14,7 @@ public class Authorization {
         // результатов - например, IncorrectPassword и так далее
         if (!Objects.equals(
                 encodeString,
-                new Configuration().credentialsToBase64()
+                "bnVsbDpudWxs"
         )) {
             return Status.AUTH_INCORRECT;
         } else {

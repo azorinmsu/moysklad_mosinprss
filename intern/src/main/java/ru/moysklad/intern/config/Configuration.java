@@ -3,7 +3,6 @@ package ru.moysklad.intern.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 @Component
@@ -20,6 +19,9 @@ public class Configuration {
 
     // temp function
     public String credentialsToBase64() {
-        return Base64.getEncoder().encodeToString((this.login + ":" + this.password).getBytes());
+        return  "Basic " + Base64
+                .getEncoder()
+                .encodeToString(
+                        (this.login + ":" + this.password).getBytes());
     }
 }

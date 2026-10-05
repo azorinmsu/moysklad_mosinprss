@@ -1,4 +1,4 @@
-package ru.moysklad.intern.services.versioning;
+package ru.moysklad.intern.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -8,5 +8,5 @@ import org.springframework.web.bind.annotation.RequestMapping;
  */
 
 @RequestMapping("/api")
-abstract public class BaseService {
+abstract public class BaseController {
 }
