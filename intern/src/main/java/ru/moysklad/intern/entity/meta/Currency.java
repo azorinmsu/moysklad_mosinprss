@@ -12,6 +12,11 @@ import java.util.UUID;
 public class Currency {
     public Currency() {}
 
+    public Currency(
+            String name,
+            UUID externalId
+    ) {}
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

@@ -1,15 +1,12 @@
 package ru.moysklad.intern.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ReflectionUtils;
 import ru.moysklad.intern.config.Configuration;
-import ru.moysklad.intern.dto.product.ProductRequest;
-import ru.moysklad.intern.dto.product.ProductResponse;
+import ru.moysklad.intern.dto.product.*;
 import ru.moysklad.intern.entity.Product;
 import ru.moysklad.intern.entity.meta.Currency;
 import ru.moysklad.intern.entity.meta.UnitOfMeasurement;

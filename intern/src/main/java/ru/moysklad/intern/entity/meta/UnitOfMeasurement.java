@@ -13,6 +13,12 @@ import java.util.UUID;
 public class UnitOfMeasurement {
     public UnitOfMeasurement() {}
 
+    public UnitOfMeasurement(
+            String name,
+            String description,
+            UUID externalId
+    ) {}
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

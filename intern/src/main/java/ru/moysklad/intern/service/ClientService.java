@@ -1,4 +1,4 @@
 package ru.moysklad.intern.service;
 
-public class CurrencyService {
+public class ClientService {
 }

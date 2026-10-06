@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface UnitOfMeasurementRepository extends JpaRepository<UnitOfMeasurement, UUID> {
     UnitOfMeasurement findByName(String name);
+    UnitOfMeasurement findByExternalId(UUID externalId);
 }
