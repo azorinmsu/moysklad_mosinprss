@@ -1,12 +1,13 @@
 package ru.moysklad.intern.controller;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import ru.moysklad.intern.dto.product.*;
 import ru.moysklad.intern.service.ProductService;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,13 +22,15 @@ public class ProductController {
     public @ResponseBody ProductResponse getProductByID(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION) String authHeader,
             @PathVariable("id") String id) {
-        return (ProductResponse) productService.getProduct(authHeader, id);
+        return productService.getProduct(authHeader, id);
     }
 
+    // uses page, size and sort parameters
     @GetMapping
-    public @ResponseBody List<ProductResponse> getListOfProducts(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION) String authHeader) {
-        return null;
+    public @ResponseBody Page<ProductResponse> getListOfProducts(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION) String authHeader,
+            Pageable pageable) {
+        return productService.getProducts(authHeader, pageable);
     }
 
     @PostMapping
@@ -54,9 +57,10 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
-    public @ResponseBody HttpStatus deleteProduct(
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public @ResponseBody void deleteProduct(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION) String authHeader,
             @PathVariable("id") String id) {
-        return productService.removeProduct(authHeader, id);
+        productService.removeProduct(authHeader, id);
     }
 }
