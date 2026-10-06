@@ -24,6 +24,11 @@ public class UnitOfMeasurement {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
+    @Column(name = "description", nullable = true)
+    private String description;
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
     // даже если тип удален, нужно ОСТАВИТЬ сам товар
     @OneToMany(mappedBy = "uom", cascade = CascadeType.ALL, orphanRemoval = false)
     // todo: доделать завтра все связи и смержить в бд

@@ -1,28 +1,43 @@
 package ru.moysklad.intern.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ReflectionUtils;
 import ru.moysklad.intern.config.Configuration;
-import ru.moysklad.intern.dto.product.ProductAddNewRequest;
+import ru.moysklad.intern.dto.product.ProductRequest;
 import ru.moysklad.intern.dto.product.ProductResponse;
 import ru.moysklad.intern.entity.Product;
 import ru.moysklad.intern.entity.meta.Currency;
 import ru.moysklad.intern.entity.meta.UnitOfMeasurement;
+import ru.moysklad.intern.exception.IDNotProvided;
 import ru.moysklad.intern.exception.UnauthorizedException;
 import ru.moysklad.intern.repo.ProductRepository;
 import ru.moysklad.intern.repo.meta.CurrencyRepository;
 import ru.moysklad.intern.repo.meta.UnitOfMeasurementRepository;
 
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class ProductService {
-    private ProductRepository productRepository;
-    private UnitOfMeasurementRepository unitOfMeasurementRepository;
-    private CurrencyRepository currencyRepository;
+    private final ProductRepository productRepository;
+    private final UnitOfMeasurementRepository unitOfMeasurementRepository;
+    private final CurrencyRepository currencyRepository;
 
     private final Configuration configuration;
 
-    public ProductService(Configuration configuration) {
+    @Autowired
+    public ProductService(ProductRepository productRepository,
+                          UnitOfMeasurementRepository unitOfMeasurementRepository,
+                          CurrencyRepository currencyRepository,
+                          Configuration configuration) {
+        this.productRepository = productRepository;
+        this.unitOfMeasurementRepository = unitOfMeasurementRepository;
+        this.currencyRepository = currencyRepository;
         this.configuration = configuration;
     }
 
@@ -32,7 +47,81 @@ public class ProductService {
         return expected.equals(authHeader);
     }
 
-    public ProductResponse newProduct(String authHeader, ProductAddNewRequest body) {
+    public Object getProduct(String authHeader, String id) {
+        if (!isAuthorized(authHeader))
+            throw new UnauthorizedException("Неверные данные для авторизации");
+        if (id.isBlank()) throw new IDNotProvided("Требуется ID");
+        return productRepository.findById(UUID.fromString(id));
+    }
+
+    public HttpStatus removeProduct(String authHeader, String id) {
+        if (!isAuthorized(authHeader))
+            throw new UnauthorizedException("Неверные данные для авторизации");
+        if (id.isBlank()) throw new IDNotProvided("Требуется ID");
+        Product res = productRepository.findById(UUID.fromString(id)).orElseThrow();
+        res.setArchived(true);
+        productRepository.save(res);
+        return HttpStatus.NO_CONTENT;
+    }
+
+    public ProductResponse updateFullyProduct(String authHeader, String id, ProductRequest updates) {
+        if (!isAuthorized(authHeader))
+            throw new UnauthorizedException("Неверные данные для авторизации");
+        if (id.isBlank()) throw new IDNotProvided("Требуется ID");
+
+        UnitOfMeasurement uom =
+                unitOfMeasurementRepository.findByName(updates.uom());
+        Currency currency =
+                currencyRepository.findByName(updates.currency());
+
+        Product p = productRepository.findById(UUID.fromString(id)).orElseThrow();
+
+        p.setName(updates.name());
+        if (!updates.description().isBlank()) p.setDescription(updates.description());
+        p.setUom(uom); // Здесь должна быть логика добавления по имени uuid...
+        p.setCurrency(currency);
+        p.setPrice(new BigDecimal(updates.price()));
+
+        productRepository.save(p);
+        return new ProductResponse(
+                p.getId(),
+                p.getName(),
+                p.getDescription(),
+                p.getUom(),
+                p.getPrice().toString(),
+                p.getCurrency(),
+                p.getModifiers()
+        );
+    }
+
+    // for patch method
+    public ProductResponse updatePartiallyProduct(String authHeader, String id, Map<String, Object> updates) {
+        if (!isAuthorized(authHeader))
+            throw new UnauthorizedException("Неверные данные для авторизации");
+        if (id.isBlank()) throw new IDNotProvided("Требуется ID");
+
+        Product p = productRepository.findById(UUID.fromString(id)).orElseThrow();
+
+        updates.forEach((key, val) -> {
+            Field field = ReflectionUtils.findField(Product.class, key);
+            if (field != null) {
+                field.setAccessible(true);
+                ReflectionUtils.setField(field, p, val);
+            }
+        });
+        productRepository.save(p);
+        return new ProductResponse(
+                p.getId(),
+                p.getName(),
+                p.getDescription(),
+                p.getUom(),
+                p.getPrice().toString(),
+                p.getCurrency(),
+                p.getModifiers()
+        );
+    }
+
+    public ProductResponse createProduct(String authHeader, ProductRequest body) {
         if (!isAuthorized(authHeader))
             throw new UnauthorizedException("Неверные данные для авторизации");
 
@@ -44,6 +133,19 @@ public class ProductService {
         Product p = new Product();
         p.setName(body.name());
         if (!body.description().isBlank()) p.setDescription(body.description());
-        p.setUom(); // Здесь должна быть логика добавления по имени uuid...
+        p.setUom(uom); // Здесь должна быть логика добавления по имени uuid...
+        p.setCurrency(currency);
+        p.setPrice(new BigDecimal(body.price()));
+
+        productRepository.save(p);
+        return new ProductResponse(
+                p.getId(),
+                p.getName(),
+                p.getDescription(),
+                p.getUom(),
+                p.getPrice().toString(),
+                p.getCurrency(),
+                p.getModifiers()
+        );
     }
 }

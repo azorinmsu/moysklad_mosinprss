@@ -17,6 +17,14 @@ public class Configuration {
     private String password;
     public String getPassword() { return password; }
 
+    @Value("${api.credentials.login}")
+    private String clientLogin;
+    public String getClientLogin() { return clientLogin; }
+
+    @Value("${api.credentials.password}")
+    private String clientPassword;
+    public String getClientPassword() { return clientPassword; }
+
     // temp function
     public String credentialsToBase64() {
         return  "Basic " + Base64
