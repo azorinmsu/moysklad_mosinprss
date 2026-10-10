@@ -205,12 +205,6 @@ databaseChangeLog:
         referencedColumnNames: id
         referencedTableName: modifiers
         validate: true
-
-databaseChangeLog: []
-
-databaseChangeLog: []
-
-databaseChangeLog:
 - changeSet:
     id: 1791211375850-1
     author: acer (generated)

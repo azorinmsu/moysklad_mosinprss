@@ -1,0 +1,434 @@
+databaseChangeLog:
+- changeSet:
+    id: 003-serial-stock-warehouse
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: warehouse
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: warehousePK
+        - column:
+            name: name
+            type: VARCHAR(255)
+            constraints:
+              nullable: false
+- changeSet:
+    id: 003-serial-stock-lot
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: lot
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: lotPK
+        - column:
+            name: name
+            type: VARCHAR(255)
+            constraints:
+              nullable: false
+- changeSet:
+    id: 003-serial-stock-serial-number
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: serial_number
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: serialNumberPK
+        - column:
+            name: name
+            type: VARCHAR(255)
+            constraints:
+              nullable: false
+        - column:
+            name: lot_id
+            type: UUID
+            constraints:
+              nullable: false
+    - addUniqueConstraint:
+        tableName: serial_number
+        columnNames: lot_id, name
+        constraintName: uq_serial_number_lot_name
+    - addForeignKeyConstraint:
+        baseTableName: serial_number
+        baseColumnNames: lot_id
+        referencedTableName: lot
+        referencedColumnNames: id
+        constraintName: fk_serial_number_lot
+        validate: true
+- changeSet:
+    id: 003-serial-stock-documents
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: documents
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: documentsPK
+        - column:
+            name: dtype
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: name
+            type: VARCHAR(255)
+            constraints:
+              nullable: false
+        - column:
+            name: moment
+            type: TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: created
+            type: TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: applicable
+            type: BOOLEAN
+            constraints:
+              nullable: false
+        - column:
+            name: source_store_id
+            type: UUID
+        - column:
+            name: target_store_id
+            type: UUID
+    - addForeignKeyConstraint:
+        baseTableName: documents
+        baseColumnNames: source_store_id
+        referencedTableName: warehouse
+        referencedColumnNames: id
+        constraintName: fk_documents_source_store
+        validate: true
+    - addForeignKeyConstraint:
+        baseTableName: documents
+        baseColumnNames: target_store_id
+        referencedTableName: warehouse
+        referencedColumnNames: id
+        constraintName: fk_documents_target_store
+        validate: true
+- changeSet:
+    id: 003-serial-stock-documents-with-positions
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: documents_with_positions
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: documentsWithPositionsPK
+    - addForeignKeyConstraint:
+        baseTableName: documents_with_positions
+        baseColumnNames: id
+        referencedTableName: documents
+        referencedColumnNames: id
+        constraintName: fk_documents_with_positions_documents
+        validate: true
+- changeSet:
+    id: 003-serial-stock-goods-acceptance
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: goods_acceptance
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: goodsAcceptancePK
+    - addForeignKeyConstraint:
+        baseTableName: goods_acceptance
+        baseColumnNames: id
+        referencedTableName: documents_with_positions
+        referencedColumnNames: id
+        constraintName: fk_goods_acceptance_documents
+        validate: true
+- changeSet:
+    id: 003-serial-stock-shipment
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: shipment
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: shipmentPK
+    - addForeignKeyConstraint:
+        baseTableName: shipment
+        baseColumnNames: id
+        referencedTableName: documents_with_positions
+        referencedColumnNames: id
+        constraintName: fk_shipment_documents
+        validate: true
+- changeSet:
+    id: 003-serial-stock-shift
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: shift
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: shiftPK
+    - addForeignKeyConstraint:
+        baseTableName: shift
+        baseColumnNames: id
+        referencedTableName: documents_with_positions
+        referencedColumnNames: id
+        constraintName: fk_shift_documents
+        validate: true
+- changeSet:
+    id: 003-serial-stock-machining
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: machining
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: machiningPK
+    - addForeignKeyConstraint:
+        baseTableName: machining
+        baseColumnNames: id
+        referencedTableName: documents_with_positions
+        referencedColumnNames: id
+        constraintName: fk_machining_documents
+        validate: true
+- changeSet:
+    id: 003-serial-stock-make
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: make
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: makePK
+    - addForeignKeyConstraint:
+        baseTableName: make
+        baseColumnNames: id
+        referencedTableName: documents_with_positions
+        referencedColumnNames: id
+        constraintName: fk_make_documents
+        validate: true
+- changeSet:
+    id: 003-serial-stock-positions
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: positions
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: positionsPK
+        - column:
+            name: document_id
+            type: UUID
+            constraints:
+              nullable: false
+        - column:
+            name: lot_id
+            type: UUID
+            constraints:
+              nullable: false
+        - column:
+            name: position_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+    - addForeignKeyConstraint:
+        baseTableName: positions
+        baseColumnNames: document_id
+        referencedTableName: documents
+        referencedColumnNames: id
+        constraintName: fk_positions_documents
+        validate: true
+    - addForeignKeyConstraint:
+        baseTableName: positions
+        baseColumnNames: lot_id
+        referencedTableName: lot
+        referencedColumnNames: id
+        constraintName: fk_positions_lot
+        validate: true
+- changeSet:
+    id: 003-serial-stock-positions-serial-number
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: positions_serial_number
+        columns:
+        - column:
+            name: positions_id
+            type: UUID
+            constraints:
+              nullable: false
+        - column:
+            name: serial_number_id
+            type: UUID
+            constraints:
+              nullable: false
+    - addPrimaryKey:
+        tableName: positions_serial_number
+        columnNames: positions_id, serial_number_id
+        constraintName: positionsSerialNumberPK
+    - addForeignKeyConstraint:
+        baseTableName: positions_serial_number
+        baseColumnNames: positions_id
+        referencedTableName: positions
+        referencedColumnNames: id
+        constraintName: fk_positions_serial_number_positions
+        validate: true
+    - addForeignKeyConstraint:
+        baseTableName: positions_serial_number
+        baseColumnNames: serial_number_id
+        referencedTableName: serial_number
+        referencedColumnNames: id
+        constraintName: fk_positions_serial_number_serial_number
+        validate: true
+- changeSet:
+    id: 003-serial-stock-stock
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: stock
+        columns:
+        - column:
+            name: id
+            type: UUID
+            constraints:
+              primaryKey: true
+              nullable: false
+              primaryKeyName: stockPK
+        - column:
+            name: serial_number_id
+            type: UUID
+            constraints:
+              nullable: false
+        - column:
+            name: lot_id
+            type: UUID
+            constraints:
+              nullable: false
+        - column:
+            name: place_id
+            type: UUID
+            constraints:
+              nullable: false
+        - column:
+            name: document_id
+            type: UUID
+            constraints:
+              nullable: false
+        - column:
+            name: moment
+            type: TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: momentfrom
+            type: TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: momentto
+            type: TIMESTAMP
+        - column:
+            name: stock
+            type: INTEGER
+            constraints:
+              nullable: false
+        - column:
+            name: delta
+            type: INTEGER
+            constraints:
+              nullable: false
+    - addForeignKeyConstraint:
+        baseTableName: stock
+        baseColumnNames: serial_number_id
+        referencedTableName: serial_number
+        referencedColumnNames: id
+        constraintName: fk_stock_serial_number
+        validate: true
+    - addForeignKeyConstraint:
+        baseTableName: stock
+        baseColumnNames: lot_id
+        referencedTableName: lot
+        referencedColumnNames: id
+        constraintName: fk_stock_lot
+        validate: true
+    - addForeignKeyConstraint:
+        baseTableName: stock
+        baseColumnNames: place_id
+        referencedTableName: warehouse
+        referencedColumnNames: id
+        constraintName: fk_stock_place
+        validate: true
+    - addForeignKeyConstraint:
+        baseTableName: stock
+        baseColumnNames: document_id
+        referencedTableName: documents
+        referencedColumnNames: id
+        constraintName: fk_stock_documents
+        validate: true
+    - createIndex:
+        tableName: stock
+        indexName: idx_stock_serial_number_lot_place
+        columns:
+        - column:
+            name: serial_number_id
+        - column:
+            name: lot_id
+        - column:
+            name: place_id
+        - column:
+            name: momentfrom
