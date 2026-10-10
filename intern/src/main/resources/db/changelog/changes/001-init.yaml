@@ -1,0 +1,224 @@
+databaseChangeLog:
+- changeSet:
+    id: 1791110525563-1
+    author: acer (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: attributesPK
+            name: id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(255)
+        - column:
+            name: value
+            type: VARCHAR(255)
+        - column:
+            name: modifier_id
+            type: UUID
+        tableName: attributes
+- changeSet:
+    id: 1791110525563-2
+    author: acer (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: currencyPK
+            name: id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: external_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(255)
+        tableName: currency
+- changeSet:
+    id: 1791110525563-3
+    author: acer (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: modifiersPK
+            name: id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: article
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(255)
+        - column:
+            name: product_id
+            type: UUID
+        tableName: modifiers
+- changeSet:
+    id: 1791110525563-4
+    author: acer (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: productsPK
+            name: id
+            type: UUID
+        - column:
+            name: archived
+            type: BOOLEAN
+        - column:
+            name: description
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(255)
+        - column:
+            name: price
+            type: numeric(19, 2)
+        - column:
+            name: currency_id
+            type: UUID
+        - column:
+            name: uom_id
+            type: UUID
+        tableName: products
+- changeSet:
+    id: 1791110525563-5
+    author: acer (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: uomPK
+            name: id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: external_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(255)
+        tableName: uom
+- changeSet:
+    id: 1791110525563-6
+    author: acer (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: name
+        indexName: IDX67ejkicfu2fjfmrs2spn7j898
+        tableName: modifiers
+- changeSet:
+    id: 1791110525563-7
+    author: acer (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: name
+        indexName: IDXo61fmio5yukmmiqgnxf8pnavn
+        tableName: products
+- changeSet:
+    id: 1791110525563-8
+    author: acer (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: product_id
+        baseTableName: modifiers
+        constraintName: FK15oy5cm5y81rld7e5evf99y16
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: products
+        validate: true
+- changeSet:
+    id: 1791110525563-9
+    author: acer (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: currency_id
+        baseTableName: products
+        constraintName: FK5x3an021g49vrd2e4glrqrj8s
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: currency
+        validate: true
+- changeSet:
+    id: 1791110525563-10
+    author: acer (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: uom_id
+        baseTableName: products
+        constraintName: FK8e8yoi86yfceunj4h7tkvrbnd
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: uom
+        validate: true
+- changeSet:
+    id: 1791110525563-11
+    author: acer (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: modifier_id
+        baseTableName: attributes
+        constraintName: FKeml5mnwtvwnvji496xcx4jj0o
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: modifiers
+        validate: true
+
+databaseChangeLog: []
+
+databaseChangeLog: []
+
+databaseChangeLog:
+- changeSet:
+    id: 1791211375850-1
+    author: acer (generated)
+    changes:
+    - addColumn:
+        columns:
+        - column:
+            name: description
+            type: varchar(255)
+        tableName: uom
+
