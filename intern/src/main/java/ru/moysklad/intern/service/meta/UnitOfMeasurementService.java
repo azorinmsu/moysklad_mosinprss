@@ -1,13 +1,11 @@
 package ru.moysklad.intern.service.meta;
 
 import org.springframework.web.reactive.function.client.WebClient;
-import ru.moysklad.intern.config.WebClientConfiguration;
 import ru.moysklad.intern.dto.uom.UomDto;
 import ru.moysklad.intern.dto.uom.UomListDto;
 import ru.moysklad.intern.entity.meta.UnitOfMeasurement;
 import ru.moysklad.intern.repo.meta.UnitOfMeasurementRepository;
 
-import java.util.Map;
 import java.util.UUID;
 
 public class UnitOfMeasurementService {

@@ -11,7 +11,7 @@ import ru.moysklad.intern.entity.Product;
 import ru.moysklad.intern.entity.meta.Currency;
 import ru.moysklad.intern.entity.meta.UnitOfMeasurement;
 import ru.moysklad.intern.exception.IDNotProvided;
-import ru.moysklad.intern.exception.UnauthorizedException;
+import ru.moysklad.intern.exception.auth.UnauthorizedException;
 import ru.moysklad.intern.repo.ProductRepository;
 import ru.moysklad.intern.repo.meta.CurrencyRepository;
 import ru.moysklad.intern.repo.meta.UnitOfMeasurementRepository;
@@ -106,6 +106,7 @@ public class ProductService {
         Product p = productRepository.findById(UUID.fromString(id)).orElseThrow();
 
         updates.forEach((key, val) -> {
+            //
             Field field = ReflectionUtils.findField(Product.class, key);
             if (field != null) {
                 field.setAccessible(true);

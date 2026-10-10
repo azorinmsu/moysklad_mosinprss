@@ -37,7 +37,6 @@ public class UnitOfMeasurement {
 
     // даже если тип удален, нужно ОСТАВИТЬ сам товар
     @OneToMany(mappedBy = "uom", cascade = CascadeType.ALL, orphanRemoval = false)
-    // todo: доделать завтра все связи и смержить в бд
     private List<Product> products = new ArrayList<>();
     public List<Product> getProducts() { return products; }
     public void setProducts(List<Product> products) { this.products = products; }

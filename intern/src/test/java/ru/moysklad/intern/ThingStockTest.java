@@ -20,8 +20,8 @@ import ru.moysklad.intern.entity.stock.PositionType;
 import ru.moysklad.intern.entity.stock.SerialNumber;
 import ru.moysklad.intern.entity.stock.Stock;
 import ru.moysklad.intern.entity.warehouse.Warehouse;
-import ru.moysklad.intern.exception.ThingAlreadyInStockException;
-import ru.moysklad.intern.exception.ThingNotInStockException;
+import ru.moysklad.intern.exception.thing.ThingAlreadyInStockException;
+import ru.moysklad.intern.exception.thing.ThingNotInStockException;
 import ru.moysklad.intern.repo.StockRepository;
 import ru.moysklad.intern.service.thing.ThingStockManager;
 

@@ -11,9 +11,9 @@ import ru.moysklad.intern.entity.stock.Positions;
 import ru.moysklad.intern.entity.stock.SerialNumber;
 import ru.moysklad.intern.entity.stock.Stock;
 import ru.moysklad.intern.entity.warehouse.Warehouse;
-import ru.moysklad.intern.exception.ThingAlreadyInStockException;
-import ru.moysklad.intern.exception.ThingNotInStockException;
-import ru.moysklad.intern.exception.ThingStockValidationException;
+import ru.moysklad.intern.exception.thing.ThingAlreadyInStockException;
+import ru.moysklad.intern.exception.thing.ThingNotInStockException;
+import ru.moysklad.intern.exception.thing.ThingStockValidationException;
 import ru.moysklad.intern.repo.DocumentsRepository;
 
 import java.time.LocalDateTime;
@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.UUID;
 
 import static ru.moysklad.intern.service.thing.SerialCheckStore.ALL_PLACES;
@@ -228,7 +227,7 @@ public class ThingStockManager {
     }
 
     private void checkThingStocksInternal(Collection<DocumentsWithPositions> operations) throws ThingStockValidationException {
-
+        // TODO: То, что нужно реализовать (ура, я нашел!)
     }
 
     private List<StockView> getStocks(LocalDateTime moment,

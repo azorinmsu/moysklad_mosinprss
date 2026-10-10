@@ -1,4 +1,4 @@
-package ru.moysklad.intern.exception;
+package ru.moysklad.intern.exception.thing;
 
 import java.util.Set;
 

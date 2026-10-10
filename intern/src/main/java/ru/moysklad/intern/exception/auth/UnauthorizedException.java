@@ -1,4 +1,4 @@
-package ru.moysklad.intern.exception;
+package ru.moysklad.intern.exception.auth;
 
 public class UnauthorizedException extends RuntimeException {
     public UnauthorizedException(String message) {
