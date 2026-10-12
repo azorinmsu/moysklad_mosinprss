@@ -227,7 +227,181 @@ public class ThingStockManager {
     }
 
     private void checkThingStocksInternal(Collection<DocumentsWithPositions> operations) throws ThingStockValidationException {
-        // TODO: То, что нужно реализовать (ура, я нашел!)
+        // массив, с которым работаем
+        List<DocumentsWithPositions> docs = new ArrayList<>(operations);
+        // массив косяков
+        List<IncorrectThing> incorrectThings = new ArrayList<>();
+        // первая проверка на то, что док принят и есть id
+        for (DocumentsWithPositions doc : docs) {
+            if (!doc.isApplicable()) return;
+            if (doc.getId() == null) {
+                throw new IllegalArgumentException("Для пакетной проверки документ должен быть сохранен");
+            }
+        }
+        // сортировка и группировка по дате - взял LinkedHash для сохранения порядка
+        // мб лучше стоит заменить на хэшмап, подумаю
+        Map<LocalDateTime, List<DocumentsWithPositions>> docsByMoment = new LinkedHashMap<>();
+        docs.stream()
+                .sorted(Comparator.comparing(DocumentsWithPositions::getMoment))
+                // вместо большого цикла цикл поменьше
+                .forEach(doc -> docsByMoment.computeIfAbsent(doc.getMoment(), ignored -> new ArrayList<>()).add(doc));
+
+        for (Map.Entry<LocalDateTime, List<DocumentsWithPositions>> entry : docsByMoment.entrySet()) {
+            LocalDateTime moment = entry.getKey();
+            List<DocumentsWithPositions> momentDocs = entry.getValue();
+
+            //  счётчик для ключа (серийник + партия + склад)
+            Map<SerialKey, Integer> batchCounters = new HashMap<>();
+
+            for (DocumentsWithPositions doc : momentDocs) {
+                switch (doc.getDocumentsType()) {
+                    case GOODS_ACCEPTANCE -> validateGoodsAcceptance(doc, moment, batchCounters, incorrectThings);
+                    case SHIPMENT -> validateShipment(doc, moment, batchCounters, incorrectThings);
+                    case SHIFT -> validateShift(doc, moment, batchCounters, incorrectThings);
+                    case MACHINING, MAKE -> validateProduction(doc, moment, batchCounters, incorrectThings);
+                }
+            }
+        }
+        // выбрасываем проблемы (туда их)
+        throwThingStockValidationException(incorrectThings);
+    }
+
+    /* *
+    * серия валидаторов для приемки,
+    * отгрузки, перемещения, техопераций и выполнения
+    * */
+
+    private void validateGoodsAcceptance(DocumentsWithPositions doc,
+                                         LocalDateTime moment,
+                                         Map<SerialKey, Integer> counters,
+                                         List<IncorrectThing> incorrectThings) {
+        for (Positions position : doc.getPositions()) {
+            UUID lotId = position.getLot() != null ? position.getLot().getId() : null;
+            for (SerialNumber serial : position.getSerialNumbers()) {
+                String name = trimSerial(serial);
+                if (name == null) continue;
+
+                // у приемки склад в ключе null, режим ALL_PLACES
+                SerialKey key = serialKey(name, lotId, null);
+                int quantity = counters.getOrDefault(key, 0);
+                counters.put(key, quantity + 1);
+
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, true);
+                int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
+
+                if (stock > -quantity) {
+                    incorrectThings.add(new IncorrectThing(name, IncorrectType.ALREADY_IN_STOCK));
+                }
+            }
+        }
+    }
+
+    private void validateShipment(DocumentsWithPositions doc,
+                                  LocalDateTime moment,
+                                  Map<SerialKey, Integer> counters,
+                                  List<IncorrectThing> incorrectThings) {
+        UUID sourceStore = sourceStoreId(doc);
+        for (Positions position : doc.getPositions()) {
+            UUID lotId = position.getLot() != null ? position.getLot().getId() : null;
+            for (SerialNumber serial : position.getSerialNumbers()) {
+                String name = trimSerial(serial);
+                if (name == null) continue;
+
+                // склад в ключе и проверке — sourceStore, режим ONLY_PLACE
+                SerialKey key = serialKey(name, lotId, sourceStore);
+                int quantity = counters.getOrDefault(key, 0);
+                counters.put(key, quantity + 1);
+
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, true);
+                int stock = stocks.isEmpty() ? 0 : stocks.get(0).stock;
+
+                // остатки меньше или равны колву
+                if (stock <= quantity) {
+                    incorrectThings.add(new IncorrectThing(name, IncorrectType.NOT_IN_STOCK));
+                }
+            }
+        }
+    }
+
+    private void validateShift(DocumentsWithPositions doc,
+                               LocalDateTime moment,
+                               Map<SerialKey, Integer> counters,
+                               List<IncorrectThing> incorrectThings) {
+        UUID sourceStore = sourceStoreId(doc);
+        for (Positions position : doc.getPositions()) {
+            UUID lotId = position.getLot() != null ? position.getLot().getId() : null;
+            for (SerialNumber serial : position.getSerialNumbers()) {
+                String name = trimSerial(serial);
+                if (name == null) continue;
+
+                SerialKey key = serialKey(name, lotId, sourceStore);
+                int quantity = counters.getOrDefault(key, 0);
+                counters.put(key, quantity + 1);
+
+                List<StockView> outStocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, true);
+                int outStock = outStocks.isEmpty() ? 0 : outStocks.getFirst().stock;
+                if (outStock <= quantity) {
+                    incorrectThings.add(new IncorrectThing(name, IncorrectType.NOT_IN_STOCK));
+                }
+
+                List<StockView> inStocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, EXCLUDE_PLACE, true);
+                int inStock = inStocks.isEmpty() ? 0 : inStocks.getFirst().stock;
+                if (inStock > -quantity) {
+                    incorrectThings.add(new IncorrectThing(name, IncorrectType.ALREADY_IN_STOCK));
+                }
+            }
+        }
+    }
+
+    private void validateProduction(DocumentsWithPositions doc,
+                                    LocalDateTime moment,
+                                    Map<SerialKey, Integer> counters,
+                                    List<IncorrectThing> incorrectThings) {
+        if (doc.getTargetStore() == null) {
+            throw new IllegalArgumentException("У производственной операции не указан склад продукции");
+        }
+        UUID targetStore = doc.getTargetStore().getId();
+        UUID sourceStore = sourceStoreId(doc);
+
+        for (Positions prodPos : doc.getProducts()) {
+            UUID lotId = prodPos.getLot() != null ? prodPos.getLot().getId() : null;
+            for (SerialNumber serial : prodPos.getSerialNumbers()) {
+                String name = trimSerial(serial);
+                if (name == null) continue;
+
+                SerialKey key = serialKey(name, lotId, targetStore);
+                int quantity = counters.getOrDefault(key, 0);
+                counters.put(key, quantity + 1);
+
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, true);
+                int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
+                if (stock > -quantity) {
+                    incorrectThings.add(new IncorrectThing(name, IncorrectType.ALREADY_IN_STOCK));
+                }
+            }
+        }
+
+        for (Positions matPos : doc.getPositions()) {
+            UUID lotId = matPos.getLot() != null ? matPos.getLot().getId() : null;
+            for (SerialNumber serial : matPos.getSerialNumbers()) {
+                String name = trimSerial(serial);
+                if (name == null) continue;
+
+                SerialKey key = serialKey(name, lotId, sourceStore);
+                int quantity = counters.getOrDefault(key, 0);
+                counters.put(key, quantity + 1);
+
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, true);
+                int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
+                if (stock <= quantity) {
+                    incorrectThings.add(new IncorrectThing(name, IncorrectType.NOT_IN_STOCK));
+                }
+            }
+        }
+    }
+
+    private String trimSerial(SerialNumber serial) {
+        return (serial == null  || serial.getName() == null) ? null : serial.getName().trim();
     }
 
     private List<StockView> getStocks(LocalDateTime moment,
