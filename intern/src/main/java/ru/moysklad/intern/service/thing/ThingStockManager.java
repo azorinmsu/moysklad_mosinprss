@@ -103,7 +103,8 @@ public class ThingStockManager {
         if (operation.getMoment() == null) {
             throw new IllegalArgumentException("У документа не указана дата");
         }
-        saveDocs(operation);
+        DocumentsWithPositions saved = saveDocs(operation);
+        checkThingStocks(List.of(saved));
         recalculateAll();
     }
 
@@ -228,16 +229,17 @@ public class ThingStockManager {
 
     private void checkThingStocksInternal(Collection<DocumentsWithPositions> operations) throws ThingStockValidationException {
         // массив, с которым работаем
-        List<DocumentsWithPositions> docs = new ArrayList<>(operations);
-        // массив косяков
+        List<DocumentsWithPositions> docs = new ArrayList<>(operations)
+                .stream()
+                .filter(DocumentsWithPositions::isApplicable)
+                .toList();
+        if (docs.isEmpty()) return;
+        // массив ошибок
         List<IncorrectThing> incorrectThings = new ArrayList<>();
         // первая проверка на то, что док принят и есть id
-        for (DocumentsWithPositions doc : docs) {
-            if (!doc.isApplicable()) return;
-            if (doc.getId() == null) {
-                throw new IllegalArgumentException("Для пакетной проверки документ должен быть сохранен");
-            }
-        }
+        for (DocumentsWithPositions doc : docs) if (doc.getId() == null)
+            throw new IllegalArgumentException("Для пакетной проверки документ должен быть сохранен");
+
         // сортировка и группировка по дате - взял LinkedHash для сохранения порядка
         // мб лучше стоит заменить на хэшмап, подумаю
         Map<LocalDateTime, List<DocumentsWithPositions>> docsByMoment = new LinkedHashMap<>();
@@ -287,7 +289,7 @@ public class ThingStockManager {
                 counters.put(key, quantity + 1);
 
                 List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, true);
-                int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
+                int stock = totalStock(stocks);
 
                 if (stock > -quantity) {
                     incorrectThings.add(new IncorrectThing(name, IncorrectType.ALREADY_IN_STOCK));
@@ -313,7 +315,7 @@ public class ThingStockManager {
                 counters.put(key, quantity + 1);
 
                 List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, true);
-                int stock = stocks.isEmpty() ? 0 : stocks.get(0).stock;
+                int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
 
                 // остатки меньше или равны колву
                 if (stock <= quantity) {
@@ -345,7 +347,8 @@ public class ThingStockManager {
                 }
 
                 List<StockView> inStocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, EXCLUDE_PLACE, true);
-                int inStock = inStocks.isEmpty() ? 0 : inStocks.getFirst().stock;
+                int inStock = totalStock(inStocks);
+
                 if (inStock > -quantity) {
                     incorrectThings.add(new IncorrectThing(name, IncorrectType.ALREADY_IN_STOCK));
                 }
@@ -374,7 +377,7 @@ public class ThingStockManager {
                 counters.put(key, quantity + 1);
 
                 List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, true);
-                int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
+                int stock = totalStock(stocks);
                 if (stock > -quantity) {
                     incorrectThings.add(new IncorrectThing(name, IncorrectType.ALREADY_IN_STOCK));
                 }
@@ -402,6 +405,12 @@ public class ThingStockManager {
 
     private String trimSerial(SerialNumber serial) {
         return (serial == null  || serial.getName() == null) ? null : serial.getName().trim();
+    }
+
+    private int totalStock(List<StockView> stocks) {
+        int sum = 0;
+        for (StockView s : stocks) sum += s.stock;
+        return sum;
     }
 
     private List<StockView> getStocks(LocalDateTime moment,
