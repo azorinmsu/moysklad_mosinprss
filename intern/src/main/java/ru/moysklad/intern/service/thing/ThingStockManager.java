@@ -6,7 +6,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.moysklad.intern.entity.operation.DocumentsType;
 import ru.moysklad.intern.entity.operation.DocumentsWithPositions;
+import ru.moysklad.intern.entity.operation.DocumentsWithPositions.PrevThing;
+import ru.moysklad.intern.entity.operation.DocumentsWithPositions.PreviousState;
 import ru.moysklad.intern.entity.stock.Lot;
+import ru.moysklad.intern.entity.stock.PositionType;
 import ru.moysklad.intern.entity.stock.Positions;
 import ru.moysklad.intern.entity.stock.SerialNumber;
 import ru.moysklad.intern.entity.stock.Stock;
@@ -94,7 +97,7 @@ public class ThingStockManager {
             operationsByType.computeIfAbsent(operation.getDocumentsType(), type -> new ArrayList<>()).add(operation);
         }
         for (List<DocumentsWithPositions> grouped : operationsByType.values()) {
-            checkThingStocksInternal(grouped);
+            checkThingStocksInternal(grouped, null);
         }
     }
 
@@ -103,8 +106,11 @@ public class ThingStockManager {
         if (operation.getMoment() == null) {
             throw new IllegalArgumentException("У документа не указана дата");
         }
+        PreviousState previous = operation.previousState();
         DocumentsWithPositions saved = saveDocs(operation);
-        checkThingStocks(List.of(saved));
+        checkThingStocksInternal(List.of(saved), previous);
+        saved.captureSnapshot();
+        operation.copySnapshotFrom(saved);
         recalculateAll();
     }
 
@@ -227,7 +233,8 @@ public class ThingStockManager {
         };
     }
 
-    private void checkThingStocksInternal(Collection<DocumentsWithPositions> operations) throws ThingStockValidationException {
+    private void checkThingStocksInternal(Collection<DocumentsWithPositions> operations,
+                                           PreviousState previous) throws ThingStockValidationException {
         // массив, с которым работаем
         List<DocumentsWithPositions> docs = new ArrayList<>(operations)
                 .stream()
@@ -256,11 +263,13 @@ public class ThingStockManager {
             Map<SerialKey, Integer> batchCounters = new HashMap<>();
 
             for (DocumentsWithPositions doc : momentDocs) {
+                // previous только для одиночного update из apply; в пакетной проверке — null
+                PreviousState docPrevious = operations.size() == 1 ? previous : null;
                 switch (doc.getDocumentsType()) {
-                    case GOODS_ACCEPTANCE -> validateGoodsAcceptance(doc, moment, batchCounters, incorrectThings);
-                    case SHIPMENT -> validateShipment(doc, moment, batchCounters, incorrectThings);
-                    case SHIFT -> validateShift(doc, moment, batchCounters, incorrectThings);
-                    case MACHINING, MAKE -> validateProduction(doc, moment, batchCounters, incorrectThings);
+                    case GOODS_ACCEPTANCE -> validateGoodsAcceptance(doc, moment, batchCounters, incorrectThings, docPrevious);
+                    case SHIPMENT -> validateShipment(doc, moment, batchCounters, incorrectThings, docPrevious);
+                    case SHIFT -> validateShift(doc, moment, batchCounters, incorrectThings, docPrevious);
+                    case MACHINING, MAKE -> validateProduction(doc, moment, batchCounters, incorrectThings, docPrevious);
                 }
             }
         }
@@ -276,7 +285,8 @@ public class ThingStockManager {
     private void validateGoodsAcceptance(DocumentsWithPositions doc,
                                          LocalDateTime moment,
                                          Map<SerialKey, Integer> counters,
-                                         List<IncorrectThing> incorrectThings) {
+                                         List<IncorrectThing> incorrectThings,
+                                         PreviousState previous) {
         for (Positions position : doc.getPositions()) {
             UUID lotId = position.getLot() != null ? position.getLot().getId() : null;
             for (SerialNumber serial : position.getSerialNumbers()) {
@@ -288,7 +298,8 @@ public class ThingStockManager {
                 int quantity = counters.getOrDefault(key, 0);
                 counters.put(key, quantity + 1);
 
-                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, true);
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, previous == null);
+                compensatePreviousOperation(stocks, doc, previous);
                 int stock = totalStock(stocks);
 
                 if (stock > -quantity) {
@@ -301,7 +312,8 @@ public class ThingStockManager {
     private void validateShipment(DocumentsWithPositions doc,
                                   LocalDateTime moment,
                                   Map<SerialKey, Integer> counters,
-                                  List<IncorrectThing> incorrectThings) {
+                                  List<IncorrectThing> incorrectThings,
+                                  PreviousState previous) {
         UUID sourceStore = sourceStoreId(doc);
         for (Positions position : doc.getPositions()) {
             UUID lotId = position.getLot() != null ? position.getLot().getId() : null;
@@ -314,7 +326,8 @@ public class ThingStockManager {
                 int quantity = counters.getOrDefault(key, 0);
                 counters.put(key, quantity + 1);
 
-                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, true);
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, previous == null);
+                compensatePreviousOperation(stocks, doc, previous);
                 int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
 
                 // остатки меньше или равны колву
@@ -328,7 +341,8 @@ public class ThingStockManager {
     private void validateShift(DocumentsWithPositions doc,
                                LocalDateTime moment,
                                Map<SerialKey, Integer> counters,
-                               List<IncorrectThing> incorrectThings) {
+                               List<IncorrectThing> incorrectThings,
+                               PreviousState previous) {
         UUID sourceStore = sourceStoreId(doc);
         for (Positions position : doc.getPositions()) {
             UUID lotId = position.getLot() != null ? position.getLot().getId() : null;
@@ -340,13 +354,15 @@ public class ThingStockManager {
                 int quantity = counters.getOrDefault(key, 0);
                 counters.put(key, quantity + 1);
 
-                List<StockView> outStocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, true);
+                List<StockView> outStocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, previous == null);
+                compensatePreviousOperation(outStocks, doc, previous);
                 int outStock = outStocks.isEmpty() ? 0 : outStocks.getFirst().stock;
                 if (outStock <= quantity) {
                     incorrectThings.add(new IncorrectThing(name, IncorrectType.NOT_IN_STOCK));
                 }
 
-                List<StockView> inStocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, EXCLUDE_PLACE, true);
+                List<StockView> inStocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, EXCLUDE_PLACE, previous == null);
+                compensatePreviousOperation(inStocks, doc, previous);
                 int inStock = totalStock(inStocks);
 
                 if (inStock > -quantity) {
@@ -359,7 +375,8 @@ public class ThingStockManager {
     private void validateProduction(DocumentsWithPositions doc,
                                     LocalDateTime moment,
                                     Map<SerialKey, Integer> counters,
-                                    List<IncorrectThing> incorrectThings) {
+                                    List<IncorrectThing> incorrectThings,
+                                    PreviousState previous) {
         if (doc.getTargetStore() == null) {
             throw new IllegalArgumentException("У производственной операции не указан склад продукции");
         }
@@ -376,7 +393,8 @@ public class ThingStockManager {
                 int quantity = counters.getOrDefault(key, 0);
                 counters.put(key, quantity + 1);
 
-                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, true);
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, null, ALL_PLACES, previous == null);
+                compensatePreviousOperation(stocks, doc, previous);
                 int stock = totalStock(stocks);
                 if (stock > -quantity) {
                     incorrectThings.add(new IncorrectThing(name, IncorrectType.ALREADY_IN_STOCK));
@@ -394,7 +412,8 @@ public class ThingStockManager {
                 int quantity = counters.getOrDefault(key, 0);
                 counters.put(key, quantity + 1);
 
-                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, true);
+                List<StockView> stocks = getStocks(moment, Set.of(name), doc.getId(), lotId, sourceStore, ONLY_PLACE, previous == null);
+                compensatePreviousOperation(stocks, doc, previous);
                 int stock = stocks.isEmpty() ? 0 : stocks.getFirst().stock;
                 if (stock <= quantity) {
                     incorrectThings.add(new IncorrectThing(name, IncorrectType.NOT_IN_STOCK));
@@ -503,6 +522,58 @@ public class ThingStockManager {
         return candidate.getMoment().isAfter(current.getMoment());
     }
 
+    /**
+     * Остатки в таблице Stock посчитаны с учётом предыдущей версии документа.
+     * При update откатываем её вклад, иначе проверка видит «чужой» остаток
+     * (типичный кейс: перенос момента приёмки при уже существующей второй приёмке).
+     */
+    private void compensatePreviousOperation(List<StockView> stocks,
+                                             DocumentsWithPositions operation,
+                                             PreviousState previous) {
+        if (operation.getId() == null || previous == null || !previous.applicable()) {
+            return;
+        }
+        if (previous.moment() == null || previous.moment().isAfter(operation.getMoment())) {
+            return;
+        }
+        for (StockView stock : stocks) {
+            PrevThing prevThing = previous.things().stream()
+                    .filter(thing -> thing.thingId().equals(stock.serialId))
+                    .findAny()
+                    .orElse(null);
+            if (prevThing == null) {
+                continue;
+            }
+            if (previous.sourceStoreId() != null
+                    && previous.sourceStoreId().equals(stock.placeId)
+                    && needAddStock(operation, prevThing)) {
+                stock.stock++;
+            }
+            if (previous.targetStoreId() != null
+                    && previous.targetStoreId().equals(stock.placeId)
+                    && needReduceStock(operation, prevThing)) {
+                stock.stock--;
+            }
+        }
+    }
+
+    private boolean needAddStock(DocumentsWithPositions operation, PrevThing prevThing) {
+        if (operation.getDocumentsType() == DocumentsType.MACHINING
+                || operation.getDocumentsType() == DocumentsType.MAKE) {
+            return prevThing.motionType() == PositionType.MATERIAL;
+        }
+        return operation.getDocumentsType() == DocumentsType.SHIPMENT
+                || operation.getDocumentsType() == DocumentsType.SHIFT;
+    }
+
+    private boolean needReduceStock(DocumentsWithPositions operation, PrevThing prevThing) {
+        if (operation.getDocumentsType() == DocumentsType.MACHINING
+                || operation.getDocumentsType() == DocumentsType.MAKE) {
+            return prevThing.motionType() == PositionType.RESULT;
+        }
+        return operation.getDocumentsType() == DocumentsType.GOODS_ACCEPTANCE
+                || operation.getDocumentsType() == DocumentsType.SHIFT;
+    }
 
     private Map<UUID, Set<String>> lotSerials(DocumentsWithPositions operation) {
         Map<UUID, Set<String>> result = new HashMap<>();
