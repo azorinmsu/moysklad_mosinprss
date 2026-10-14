@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/001-init.yaml
   - include:
       file: db/changelog/changes/003-serial-stock.yaml
+  - include:
+      file: db/changelog/changes/004-aggregate-stock.yaml

@@ -3,11 +3,12 @@ package ru.moysklad.intern;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
 	@Bean
 	@ServiceConnection
@@ -15,4 +16,9 @@ class TestcontainersConfiguration {
 		return new PostgreSQLContainer(DockerImageName.parse("postgres:latest"));
 	}
 
+	@Bean
+	@ServiceConnection
+	ConfluentKafkaContainer kafkaContainer() {
+		return new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.1"));
+	}
 }

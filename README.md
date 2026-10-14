@@ -1,88 +1,296 @@
-# moysklad_mosinprss
+# Учебный проект: остатки, себестоимость и реализация
 
-Задание 08.10.2026 
+Один Spring Boot-модуль `intern/`: обработка складских остатков, себестоимости и заявок на реализацию товара поверх уже существующей модели серийных номеров.
 
-## Задание. Остатки серийных номеров
+---
 
-Класс `ru.moysklad.intern.service.thing.ThingStockManager` ведёт остатки серийных номеров по складским документам. Метод работает в отдельной транзакции `REQUIRES_NEW` и читает уже посчитанные строки `stock`.
+## Стек
 
-Документ меняет остаток так:
+| Компонент | Версия / выбор |
+|---|---|
+| Java | 27 |
+| Spring Boot | 4.1.1 |
+| БД | PostgreSQL + Liquibase |
+| Messaging | Apache Kafka (Spring Kafka, Jackson 3) |
+| Процессы | Camunda 7.24 embedded (`camunda-engine-spring`) |
+| Тесты | JUnit 5, Testcontainers (PostgreSQL + Kafka), Awaitility |
 
-| Тип | Что делает с серийником |
-| --- | --- |
-| `GOODS_ACCEPTANCE` (приемка) | приходует на склад-получатель |
-| `SHIPMENT` (отгрузка) | списывает со склада-отправителя |
-| `SHIFT` (перемещение) | списывает со склада-отправителя и приходует на склад-получатель |
-| `MACHINING` (техоперация) | списывает материалы со склада материалов и приходует продукцию на склад продукции |
-| `MAKE` (выполнение этапа) | то же, что техоперация |
+Код приложения: `intern/src/main/java/ru/moysklad/intern/`.
 
-Публичные методы:
+Локальный запуск: Java 27, PostgreSQL, Kafka (`KAFKA_BOOTSTRAP_SERVERS`, по умолчанию `localhost:9092`), переменные из `.env` (см. `intern/.env.example`).
 
-- `addSerialsToWarehouse` проводит документ, который приходует серийники: приемка, перемещение, техоперация, выполнение этапа.
-- `writeOffSerialsFromWarehouse` проводит документ, который списывает серийники: отгрузка, перемещение, техоперация, выполнение этапа.
-- `removeOperation` удаляет документ и пересчитывает остатки без него.
-- `checkThingStocks(Collection)` группирует документы по `DocumentsType` и для каждой группы вызывает `checkThingStocksInternal`. Сам остаток этот метод не меняет.
+```bash
+cd intern
+./mvnw test
+./mvnw spring-boot:run
+```
 
-Серийник считается находящимся на складе, когда последняя строка `stock` на эту дату имеет `stock > 0`. Позиции документа берутся так: `getPositions()` — все, кроме `RESULT`; `getProducts()` — только `RESULT`. У приемки, отгрузки и перемещения продуктовых позиций нет, серийник лежит в `getPositions()` с типом `POSITION`. У техоперации и выполнения этапа материал идёт как `MATERIAL` и попадает в `getPositions()`, выпущенный серийник идёт как `RESULT` и попадает в `getProducts()`.
+---
 
-### Как учитывается серийник
+## Архитектура
 
-Остаток — это цепочка событий по ключу серийник + партия + склад. Приход даёт `delta = +1`, расход даёт `delta = -1`. На одну дату остаток равен сумме дельт всех событий этого ключа, у которых момент не позже даты документа.
+Система — **одно приложение**, которое можно запускать в нескольких инстансах. Разделение — по пакетам и ответственности, не по микросервисам.
 
-- **Приемка.** Серийник из `getPositions()` приходуется на склад-получатель (`targetStore`). На этом складе появляется остаток 1. На других складах тот же серийник этой партии лежать не должен: приемка заводит его в учёт целиком.
-- **Отгрузка.** Серийник из `getPositions()` списывается со склада-отправителя (`sourceStore`). Остаток на этом складе уменьшается на 1 и после списания становится 0. Другие склады документ не трогает.
-- **Перемещение.** Один и тот же серийник из `getPositions()` списывается со склада-отправителя и приходуется на склад-получатель. На отправителе остаток становится 0, на получателе — 1. Если отправитель и получатель — один склад, движения нет: серийник остаётся там же.
-- **Техоперация и выполнение этапа.** Это два разных серийника. Материал из `getPositions()` списывается со склада материалов (`sourceStore`), остаток материала там становится 0. Продукция из `getProducts()` приходуется на склад продукции (`targetStore`), у выпущенного серийника там появляется остаток 1. Склады материалов и продукции могут совпадать.
+### Две модели остатков
 
-### Реализовать `checkThingStocksInternal`
+| Модель | Таблица / сущности | Назначение |
+|---|---|---|
+| Серийная (уже была) | `stock`, `SerialNumber`, `Lot`, `Warehouse`, документы | История и проверка серийников. Движок — `ThingStockManager` |
+| Количественная (новая) | `aggregate_stock`, `price`, `stock_movement` | Агрегированное количество и себестоимость. Бизнес-логика шагов 2–3 — задание студента |
 
-Метод пустой. В него `checkThingStocks` уже передаёт документы одного типа. Метод остаток не записывает, он только решает, можно ли эти документы провести вместе.
+`Product` — каталожный товар. `Warehouse` — склад. `Lot` — партия (consignment). Существующий `Stock` **не** использовать как агрегированный количественный остаток.
 
-Общие правила:
+### Потоки обработки
 
-- Бери документы с `applicable == true`. Если таких нет, выйди.
-- У каждого проверяемого документа должен быть `id`. Если `id == null`, брось `IllegalArgumentException` с текстом «Для пакетной проверки документ должен быть сохранен».
-- Читай остаток через `getStocks` и исключай строки самого документа (`excludeOperation = true`), чтобы документ не упирался в собственный остаток.
-- Разложи документы по дате `moment` и иди по датам по возрастанию. Документы одной даты сверяются вместе.
-- Для ключа серийник + партия + склад заведи счётчик. Перед проверкой документа сделай так: если ключ уже есть, увеличь его на 1, если ключа нет — запиши 0. Первый документ даты видит 0. Второй документ с тем же ключом и той же датой видит 1 и конфликтует, даже если в таблице `stock` серийника ещё нет.
-- Имена серийников сравнивай и клади в исключение без пробелов по краям.
-- Собери все нарушения и брось их через `throwThingStockValidationException`. Сначала уходит `ThingAlreadyInStockException`, и только если таких серийников нет — `ThingNotInStockException`. Множество имён лежит в `getSerials()`.
+```text
+[Клиент]
+   │  POST /api/stock-change-requests
+   ▼
+StockChangeRequestService
+   │  сохранить ProcessingRequest (PENDING)
+   │  после commit → Kafka stock.commands
+   ▼
+StockChangeKafkaConsumer
+   │  идемпотентность по requestId
+   │  статус → PROCESSING
+   ▼
+Camunda process: stock-change
+   │
+   ├─ CHECK_SERIAL_NUMBERS      → ThingStockManager.checkThingStocks  (инфраструктура)
+   ├─ CHECK_AVAILABLE_STOCK     → StockValidationStep                 (студент)
+   ├─ UPDATE_STOCK_AND_PRICE    → StockAndPriceUpdateStep             (студент)
+   ├─ PUBLISH_RESULT / FAILURE  → outbox processing.results           (инфраструктура)
+   └─ END
+```
 
-Режим склада `SerialCheckStore` выбирает, какие строки `stock` видны проверке:
+```text
+[Клиент]
+   │  SalesRequestService.submit   (студент)
+   ▼
+SalesKafkaProducer → sales.commands   (студент)
+   ▼
+SalesKafkaConsumer                    (студент)
+   │  сохранить заявку PENDING
+   ▼
+Camunda timer: sales-pending-timer    (инфраструктура процесса)
+   │  ClaimPendingSalesDelegate
+   │  → SalesRequestClaimStep         (студент: захват + старт)
+   ▼
+Camunda process: sales
+   ├─ CHECK_SALES_STOCK           (студент)
+   ├─ CHECK_AVAILABLE_AMOUNT      (студент)
+   ├─ WRITE_OFF_STOCK             (студент)
+   └─ PUBLISH_RESULT / FAILURE    (инфраструктура)
+```
 
-- `ONLY_PLACE` — только указанный склад. Это расход (`checkOutputOperation`): остаток на складе должен быть больше счётчика пакета. Иначе `ThingNotInStockException`.
-- `ALL_PLACES` — любой склад. Это приход (`checkInputOperation`): видимый остаток должен быть не больше минус счётчика пакета. Иначе серийник уже числится, `ThingAlreadyInStockException`.
-- `EXCLUDE_PLACE` — все склады, кроме указанного. Тоже приход: серийник не должен уже лежать где-то помимо склада, с которого его забирают.
+Kafka **не** читается из Camunda timer. Consumer пишет заявку в БД; timer обрабатывает уже сохранённые `PENDING`.
 
-Для прихода условие такое: `stock > -quantity`. Для расхода: `stock <= quantity`. У первого документа `quantity = 0`, поэтому приход требует `stock == 0`, расход требует `stock > 0`.
+### Пакеты
 
-#### Приемка
+```text
+ru.moysklad.intern
+├── entity/
+│   ├── stock|operation|warehouse   # серийная модель и документы
+│   ├── aggregate/                  # AggregateStock, Price, StockMovement
+│   └── processing/                 # ProcessingRequest, ProcessingResult, OutboxEvent
+├── stockchange/                    # приём StockChange + Kafka + запуск Camunda
+├── sales/                          # каркасы Sales* — задание студента
+├── camunda/
+│   ├── StockChangeProcessDefinition / SalesProcessDefinition
+│   ├── ProcessContext, ProcessErrors, ProcessOutcomeRecorder
+│   ├── delegate/                   # JavaDelegate
+│   └── step/                       # бизнес-шаги (часть — TODO)
+├── kafka/                          # топики, типизированные KafkaTemplate
+├── service/thing/                  # ThingStockManager (не менять checkThingStocks)
+└── service/aggregate/              # PriceService
+```
 
-Серийники бери из `getPositions()`. Склад в ключе счётчика — `sourceStore`. У приемки его нет, поэтому в ключе склада `null`, а режим проверки — `ALL_PLACES` (`getSerialCheck`).
+### Модель данных (количественная)
 
-Что проверить: на дату документа этого серийника этой партии нет ни на одном складе. Повторная приемка того же серийника на ту же дату, в том числе на другой склад, даёт `ThingAlreadyInStockException`. Две приемки в одном пакете на одну дату конфликтуют между собой через счётчик, даже если `stock` пуст.
+- **`aggregate_stock`** — `product_id`, `store_id`, `consignment_id`, `quantity` (`BigDecimal` ≥ 0), `version`; `UNIQUE(product_id, store_id, consignment_id)`.
+- **`price`** — 1:1 к `aggregate_stock`; `unit_price`, `total_cost`; `totalCost = quantity × unitPrice`.
+- **`stock_movement`** — история дельт для проверки документов задним числом. Текущий `AggregateStock.quantity` для исторической проверки **недостаточен**.
+- **`processing_request`** — заявка (`requestId` unique, `commandType`, `status`, `correlationId`, `payload`, `version`).
+- **`processing_result`** — итог по `requestId` (unique): `SUCCESS` / `ERROR` (+ код, сообщение, missing*).
+- **`outbox_event`** — надёжная публикация результата в Kafka.
 
-#### Отгрузка
+Миграция: `intern/src/main/resources/db/changelog/changes/004-aggregate-stock.yaml`.
 
-Серийники бери из `getPositions()`. Склад в ключе и в `getStocks` — склад-отправитель. Режим — `ONLY_PLACE`.
+### Kafka
 
-Что проверить: на эту дату серийник есть на складе-отправителе, остаток больше нуля. Если остатка нет, `ThingNotInStockException`. Вторая отгрузка того же серийника с того же склада на ту же дату тоже отклоняется: счётчик пакета уже занял единицу остатка.
+| Topic | Кто пишет | Кто читает |
+|---|---|---|
+| `stock.commands` | `StockChangeKafkaProducer` (готово) | `StockChangeKafkaConsumer` (готово) |
+| `sales.commands` | `SalesKafkaProducer` (**студент**) | `SalesKafkaConsumer` (**студент**) |
+| `processing.results` | outbox → publisher (инфраструктура) | `ProcessingResult` consumer/API (инфраструктура) |
 
-#### Перемещение
+DTO: `StockChangeCommand`, `SalesCommand`, `ProcessingResultMessage`.
 
-Серийники бери из `getPositions()`. Проверок две, обе по складу-отправителю.
+### Camunda
 
-1. Расход, `ONLY_PLACE`. Серийник должен лежать на складе-отправителе. Если его там нет — `ThingNotInStockException`.
-2. Приход на остальные склады, `EXCLUDE_PLACE` с тем же складом-отправителем. Строки отправителя в эту проверку не попадают. Если серийник уже числится на складе-получателе или на любом другом складе — `ThingAlreadyInStockException`.
+BPMN **не** редактируется вручную. Процессы строятся Java BPMN Model API и деплоятся при старте (`ProcessDeployment`).
 
-Когда отправитель и получатель совпадают, вторая проверка не видит этот склад и приход проходит. Первая проверка по-прежнему требует, чтобы серийник был на этом складе.
+Почему без starter: Camunda 7 Community Spring Boot Starter не совместим со Spring Boot 4. Движок подключён через `camunda-engine-spring` и `CamundaEngineConfig` (общий DataSource, таблицы `ACT_*`).
 
-#### Техоперация и выполнение этапа
+Бизнес-ошибка шага: `ProcessContext.fail(...)` → `BpmnError(BUSINESS_ERROR)` → `PUBLISH_FAILURE`.
 
-На каждую дату сначала проверь продукцию, потом материалы.
+### Существующая серийная модель (контекст)
 
-Продукция, `getProducts()`, тип `RESULT`. Склад в ключе счётчика — склад продукции (`targetStore`). Если склада нет, брось `IllegalArgumentException` «У производственной операции не указан склад продукции». Режим — `ALL_PLACES`: выпущенного серийника не должно быть ни на одном складе. Если он уже есть — `ThingAlreadyInStockException`. Два документа пакета, которые на одну дату выпускают один и тот же серийник на один склад продукции, конфликтуют через счётчик.
+`ThingStockManager` уже реализован, в том числе `checkThingStocks`. Студент **не** переписывает этот метод.
 
-Материалы, `getPositions()`, тип `MATERIAL`. Склад в ключе и в проверке — склад материалов (`sourceStore`). Режим — `ONLY_PLACE`: материал должен быть на этом складе. Если его нет — `ThingNotInStockException`, в `getSerials()` попадает имя материала, не продукции.
+Типы документов: `GOODS_ACCEPTANCE`, `SHIPMENT`, `SHIFT`, `MACHINING`, `MAKE`.  
+Склады в модели: `Warehouse` (`sourceStore` / `targetStore`). Партия: `Lot`.
 
-Ориентир по поведению — тесты `checkThingStocks*` в `ThingStockTest`. Другие методы `ThingStockManager` не меняй.
+Сигнатура:
+
+```java
+public void checkThingStocks(Collection<? extends DocumentsWithPositions> operations)
+        throws ThingStockValidationException
+```
+
+Транзакция класса: `@Transactional(REQUIRES_NEW)`. Метод только проверяет, остатки серийников не меняет. Документы должны быть уже сохранены (`id != null`).
+
+---
+
+## Что уже сделано (не трогать без необходимости)
+
+1. Liquibase-схема агрегированных остатков, цен, движений, заявок, outbox.
+2. Репозитории и `PriceService`.
+3. StockChange: REST → сервис → Kafka producer/consumer → запуск Camunda.
+4. Программные определения процессов `stock-change`, `sales`, `sales-pending-timer`.
+5. Delegates-обёртки, `ProcessContext`, запись результата в outbox.
+6. Каркасы Sales* и шагов с TODO.
+7. Тесты инфраструктуры: миграции, Kafka StockChange, деплой Camunda.
+
+Не менять:
+
+- алгоритм `ThingStockManager.checkThingStocks` / `checkThingStocksInternal`;
+- готовый StockChange Kafka path;
+- программные process definition (можно читать, менять порядок шагов только если это осознанно нужно заданию).
+
+---
+
+## Задание студенту
+
+### Цель
+
+Научитьcя атомарно менять остатки и себестоимость под конкурентной нагрузкой, корректно учитывать историю, провести заявку на реализацию через Kafka и Camunda.
+
+### 1. Проверка количественных остатков — 15 баллов
+
+Класс: `camunda.step.StockValidationStep#validate`.
+
+Нужно:
+
+- по позициям и типу документа определить дельты количества;
+- учесть дату документа, склад, партию;
+- проверить текущий и **исторический** остаток (`StockMovement`, не только `AggregateStock.quantity`);
+- не допустить отрицательных остатков;
+- при нехватке — `context.fail(...)` с понятным кодом/сообщением и `missingQuantity`.
+
+### 2. Атомарное обновление AggregateStock и Price — 20 баллов
+
+Класс: `camunda.step.StockAndPriceUpdateStep#execute`.
+
+Нужно:
+
+- изменить `AggregateStock` и `Price` в **одной** транзакции;
+- пересчитать `totalCost`;
+- при отсутствии `unitPrice` — бизнес-ошибка;
+- запретить отрицательный остаток;
+- при ошибке откатить оба изменения;
+- на шаге 3 **повторно** обеспечить допустимость изменения (проверка на шаге 2 не гарантирует остаток к моменту записи).
+
+### 3. Защита от lost update — 20 баллов
+
+Приложение работает в нескольких потоках, consumers и инстансах. `synchronized` между JVM недостаточен.
+
+Выберите стратегию (или комбинацию):
+
+- `SELECT FOR UPDATE` / `FOR NO KEY UPDATE`;
+- атомарный `UPDATE ... WHERE quantity >= ?`;
+- optimistic locking (`version`) + retry;
+- согласованный порядок блокировок;
+- учёт конкурентного `INSERT` отсутствующего `AggregateStock`.
+
+Обязательный сценарий: остаток 100, две параллельные списания по 70 → одна `SUCCESS`, вторая `INSUFFICIENT_STOCK`, итог quantity = 30, totalCost = 300.
+
+### 4. SalesRequestService — 10 баллов
+
+Класс: `sales.SalesRequestService`.
+
+Приём заявки (товар, склад, количество, доступная сумма): валидация, `requestId`, сохранение, публикация через producer, возврат `requestId`.
+
+### 5. Kafka producer и consumer для Sales — 15 баллов
+
+Классы: `SalesKafkaProducer`, `SalesKafkaConsumer`.
+
+- публикация в `sales.commands`;
+- чтение, десериализация, идемпотентность по `requestId`;
+- сохранение заявки со статусом `PENDING`;
+- **не** читать Kafka из Camunda timer.
+
+Бин `KafkaTemplate<String, SalesCommand>` уже объявлен в инфраструктуре.
+
+### 6. Camunda-процесс реализации — 10 баллов
+
+Шаги:
+
+- `SalesStockCheckStep` — `INSUFFICIENT_STOCK` + `missingQuantity`;
+- `SalesAmountCheckStep` — `requiredAmount = quantity × salePrice`, при нехватке `INSUFFICIENT_FUNDS` + `missingAmount`;
+- `SalesWriteOffStep` — списание (желательно общая операция с AggregateStock/Price);
+- `SalesRequestClaimStep` — захват `PENDING` так, чтобы одна заявка не стартовала дважды на разных инстансах.
+
+### 7. Тесты и E2E — 10 баллов
+
+Дописать заготовки (когда появятся в репозитории) и свой E2E реализации:
+
+- успех;
+- недостаточно товара **или** недостаточно денег;
+- идемпотентность / отсутствие двойного списания.
+
+Не использовать `Thread.sleep` как основной способ синхронизации (Awaitility / ожидание статусов).
+
+### Критерии сдачи (обязательные)
+
+| Условие |
+|---|
+| Нет lost update при параллельных списаниях |
+| AggregateStock и Price меняются атомарно |
+| Корректное списание при реализации |
+| Работают Sales Kafka producer и consumer |
+| Нет двойного списания при повторной доставке сообщения |
+| Проходит E2E реализации |
+
+### Баллы
+
+| Задание | Баллы |
+|---|---:|
+| Проверка количественных остатков | 15 |
+| Атомарное обновление AggregateStock и Price | 20 |
+| Защита от lost update | 20 |
+| SalesRequestService | 10 |
+| Kafka producer и consumer | 15 |
+| Camunda-процесс реализации | 10 |
+| Самостоятельные тесты и E2E | 10 |
+| **Всего** | **100** |
+
+### Форматы
+
+**StockChangeCommand** (уже используется инфраструктурой): `requestId`, `documentId`, `documentType`, `moment`, `positions[]` (`productId`, `storeId`, `destinationStoreId?`, `consignmentId`, `quantity`, `serialNumbers`, `unitPrice`), `correlationId`.
+
+**SalesCommand**: `requestId`, `productId`, `storeId`, `quantity`, `availableAmount`, `requestedAt`, `correlationId`.
+
+**Результат** (`ProcessingResultMessage`): `requestId`, `status` (`SUCCESS` / `ERROR`), `errorCode`, `errorMessage`, `missingQuantity`, `missingAmount`, `processedAt`.
+
+API статуса заявки (инфраструктура): нет результата → `UNKNOWN` (это не то же самое, что `PENDING` у заявки).
+
+### Подсказки по конкуренции (без готового SQL-решения)
+
+Имеет смысл разобрать: lost update, race condition, optimistic / pessimistic locking, row-level locks, deadlock, уровни изоляции, идемпотентность, порядок захвата блокировок, retry при конфликте версии/транзакции.
+
+---
+
+## Предыдущее задание (выполнено, справочно)
+
+Ранее нужно было реализовать `checkThingStocksInternal` для серийных номеров. Метод **уже реализован** в `ThingStockManager`. Ориентир по поведению — тесты `checkThingStocks*` в `ThingStockTest`. В новом задании этот код вызывается как готовый сервис на шаге `CHECK_SERIAL_NUMBERS`, а не переписывается.

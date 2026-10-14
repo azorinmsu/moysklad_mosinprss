@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>27</java.version>
 		<liquibase.version>4.27.0</liquibase.version>
+		<camunda.version>7.24.0</camunda.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -46,6 +47,19 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
+		<!--
+		  Camunda 7 Community starter не поддерживает Spring Boot 4.
+		  Движок и BPMN Model API подключаются напрямую и конфигурируются в коде.
+		-->
+		<dependency>
+			<groupId>org.camunda.bpm</groupId>
+			<artifactId>camunda-engine-spring</artifactId>
+			<version>${camunda.version}</version>
 		</dependency>
 
 		<dependency>
@@ -125,6 +139,21 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-kafka</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.awaitility</groupId>
+			<artifactId>awaitility</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
