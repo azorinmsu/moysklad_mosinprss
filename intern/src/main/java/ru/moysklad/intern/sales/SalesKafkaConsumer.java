@@ -6,7 +6,11 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.moysklad.intern.dto.kafka.SalesCommand;
+import ru.moysklad.intern.entity.processing.ProcessingCommandType;
+import ru.moysklad.intern.entity.processing.ProcessingRequest;
+import ru.moysklad.intern.entity.processing.ProcessingRequestStatus;
 import ru.moysklad.intern.repo.ProcessingRequestRepository;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -31,12 +35,10 @@ public class SalesKafkaConsumer {
     private static final Logger log = LoggerFactory.getLogger(SalesKafkaConsumer.class);
     // TODO(student): зависимости и @KafkaListener
     private final ProcessingRequestRepository processingRequestRepository;
-    private final SalesProcessLauncher processLauncher;
     private final ObjectMapper objectMapper;
 
     public SalesKafkaConsumer(ProcessingRequestRepository processingRequestRepository, SalesProcessLauncher processLauncher, ObjectMapper objectMapper) {
         this.processingRequestRepository = processingRequestRepository;
-        this.processLauncher = processLauncher;
         this.objectMapper = objectMapper;
     }
 
@@ -49,6 +51,31 @@ public class SalesKafkaConsumer {
     )
     @Transactional
     public void consume(SalesCommand command) {
-        throw new UnsupportedOperationException("TODO: реализовать SalesKafkaConsumer.consume");
+        if (processingRequestRepository.findByRequestId(command.requestId()).isPresent()) {
+            log.info(
+                    "Skip Sales command requestId={}",
+                    command.requestId()
+            );
+            return;
+        }
+        createFromCommand(command);
+    }
+
+    private void createFromCommand(SalesCommand command) {
+        ProcessingRequest request = new ProcessingRequest();
+        request.setRequestId(command.requestId());
+        request.setCommandType(ProcessingCommandType.SALES);
+        request.setStatus(ProcessingRequestStatus.PENDING);
+        request.setCorrelationId(command.correlationId() != null ? command.correlationId() : command.requestId());
+        request.setPayload(toJson(command));
+        processingRequestRepository.save(request);
+    }
+
+    private String toJson(SalesCommand command) {
+        try {
+            return objectMapper.writeValueAsString(command);
+        } catch (JacksonException e) {
+            throw new IllegalStateException("Не удалось сериализовать SalesCommand", e);
+        }
     }
 }
