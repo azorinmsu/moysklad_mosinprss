@@ -1,0 +1,128 @@
+databaseChangeLog:
+- changeSet:
+    id: 005-remap-stub
+    author: mosinprss
+    changes:
+    - createTable:
+        tableName: remap_stub_product
+        columns:
+        - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+        - column: { name: name, type: VARCHAR(255), constraints: { nullable: false } }
+        - column: { name: code, type: VARCHAR(64) }
+        - column: { name: description, type: VARCHAR(1024) }
+        - column: { name: archived, type: BOOLEAN, constraints: { nullable: false }, defaultValueBoolean: false }
+        - column: { name: version, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+
+    - createTable:
+        tableName: remap_stub_stock
+        columns:
+        - column: { name: product_id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+        - column: { name: store_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: quantity, type: NUMERIC(19, 6), constraints: { nullable: false } }
+        - column: { name: reserve, type: NUMERIC(19, 6), constraints: { nullable: false } }
+        - column: { name: in_transit, type: NUMERIC(19, 6), constraints: { nullable: false }, defaultValueNumeric: 0 }
+        - column: { name: version, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+    - addForeignKeyConstraint:
+        baseTableName: remap_stub_stock
+        baseColumnNames: product_id
+        referencedTableName: remap_stub_product
+        referencedColumnNames: id
+        constraintName: fk_remap_stub_stock_product
+
+    - createTable:
+        tableName: remap_stub_customer_order
+        columns:
+        - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+        - column: { name: name, type: VARCHAR(255), constraints: { nullable: false } }
+        - column: { name: description, type: VARCHAR(1024) }
+        - column: { name: applicable, type: BOOLEAN, constraints: { nullable: false }, defaultValueBoolean: true }
+        - column: { name: moment, type: TIMESTAMP, constraints: { nullable: false } }
+        - column: { name: organization_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: agent_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: store_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: version, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+
+    - createTable:
+        tableName: remap_stub_order_position
+        columns:
+        - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+        - column: { name: order_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: product_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: quantity, type: NUMERIC(19, 6), constraints: { nullable: false } }
+        - column: { name: reserve, type: NUMERIC(19, 6), constraints: { nullable: false }, defaultValueNumeric: 0 }
+        - column: { name: price, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+        - column: { name: shipped, type: NUMERIC(19, 6), constraints: { nullable: false }, defaultValueNumeric: 0 }
+        - column: { name: version, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+    - addForeignKeyConstraint:
+        baseTableName: remap_stub_order_position
+        baseColumnNames: order_id
+        referencedTableName: remap_stub_customer_order
+        referencedColumnNames: id
+        constraintName: fk_remap_stub_order_pos_order
+        onDelete: CASCADE
+    - addForeignKeyConstraint:
+        baseTableName: remap_stub_order_position
+        baseColumnNames: product_id
+        referencedTableName: remap_stub_product
+        referencedColumnNames: id
+        constraintName: fk_remap_stub_order_pos_product
+    - createIndex:
+        tableName: remap_stub_order_position
+        indexName: idx_remap_stub_order_pos_order
+        columns:
+        - column: { name: order_id }
+
+    - createTable:
+        tableName: remap_stub_demand
+        columns:
+        - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+        - column: { name: name, type: VARCHAR(255), constraints: { nullable: false } }
+        - column: { name: description, type: VARCHAR(1024) }
+        - column: { name: applicable, type: BOOLEAN, constraints: { nullable: false }, defaultValueBoolean: false }
+        - column: { name: moment, type: TIMESTAMP, constraints: { nullable: false } }
+        - column: { name: organization_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: agent_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: store_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: customer_order_id, type: UUID }
+        - column: { name: version, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+    - addForeignKeyConstraint:
+        baseTableName: remap_stub_demand
+        baseColumnNames: customer_order_id
+        referencedTableName: remap_stub_customer_order
+        referencedColumnNames: id
+        constraintName: fk_remap_stub_demand_order
+
+    - createTable:
+        tableName: remap_stub_demand_position
+        columns:
+        - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+        - column: { name: demand_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: product_id, type: UUID, constraints: { nullable: false } }
+        - column: { name: quantity, type: NUMERIC(19, 6), constraints: { nullable: false } }
+        - column: { name: price, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+        - column: { name: version, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+    - addForeignKeyConstraint:
+        baseTableName: remap_stub_demand_position
+        baseColumnNames: demand_id
+        referencedTableName: remap_stub_demand
+        referencedColumnNames: id
+        constraintName: fk_remap_stub_demand_pos_demand
+        onDelete: CASCADE
+    - addForeignKeyConstraint:
+        baseTableName: remap_stub_demand_position
+        baseColumnNames: product_id
+        referencedTableName: remap_stub_product
+        referencedColumnNames: id
+        constraintName: fk_remap_stub_demand_pos_product
+
+    - createTable:
+        tableName: remap_stub_fault_rule
+        columns:
+        - column: { name: id, type: UUID, constraints: { primaryKey: true, nullable: false } }
+        - column: { name: method, type: VARCHAR(16), constraints: { nullable: false } }
+        - column: { name: path_pattern, type: VARCHAR(512), constraints: { nullable: false } }
+        - column: { name: fault_type, type: VARCHAR(64), constraints: { nullable: false } }
+        - column: { name: remaining_count, type: INT, constraints: { nullable: false } }
+        - column: { name: delay_ms, type: BIGINT, constraints: { nullable: false }, defaultValueNumeric: 0 }
+        - column: { name: http_status, type: INT }
+        - column: { name: created_at, type: TIMESTAMP, constraints: { nullable: false } }

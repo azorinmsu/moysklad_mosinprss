@@ -179,6 +179,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### Local tooling (JDK/Maven caches used by agents)
+.tools/
+
 ### Some additional ignores (sort later)
 *.DS_Store
 *.sw?
