@@ -5,7 +5,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import ru.moysklad.intern.dto.kafka.SalesCommand;
-import ru.moysklad.intern.dto.kafka.StockChangeCommand;
 import ru.moysklad.intern.entity.processing.ProcessingCommandType;
 import ru.moysklad.intern.entity.processing.ProcessingRequest;
 import ru.moysklad.intern.entity.processing.ProcessingRequestStatus;
@@ -18,32 +17,35 @@ import java.util.UUID;
 
 /**
  * Приём заявок на реализацию товара.
- *
- * <p><b>TODO (студент):</b> реализовать валидацию, генерацию requestId,
- * сохранение заявки и публикацию {@link SalesCommand} через {@link SalesKafkaProducer}.
  */
 @Service
 public class SalesRequestService {
 
-    // TODO(student): внедрить зависимости (репозиторий, SalesKafkaProducer, ObjectMapper и т.д.)
-    private final ProcessingRequestRepository processingRequestRepository; // вроде с репозиторием угадал
+    private final ProcessingRequestRepository processingRequestRepository;
     private final SalesKafkaProducer salesKafkaProducer;
     private final ObjectMapper objectMapper;
 
-    public SalesRequestService(ProcessingRequestRepository processingRequestRepository, SalesKafkaProducer salesKafkaProducer, ObjectMapper objectMapper) {
+    public SalesRequestService(
+            ProcessingRequestRepository processingRequestRepository,
+            SalesKafkaProducer salesKafkaProducer,
+            ObjectMapper objectMapper
+    ) {
         this.processingRequestRepository = processingRequestRepository;
         this.salesKafkaProducer = salesKafkaProducer;
         this.objectMapper = objectMapper;
     }
 
     /**
-     * TODO(student): принять заявку на реализацию и вернуть requestId.
+     * Принимает заявку на реализацию, сохраняет её со статусом PENDING
+     * и публикует в Kafka после успешного коммита транзакции.
+     *
+     * @return сгенерированный requestId
      */
     @Transactional
     public UUID submit(SalesCommand request) {
         validate(request);
 
-        UUID requestId = UUID.randomUUID();
+        UUID requestId = request.requestId() != null ? request.requestId() : UUID.randomUUID();
         UUID correlationId = request.correlationId() != null ? request.correlationId() : requestId;
         SalesCommand command = new SalesCommand(
                 requestId,
@@ -54,6 +56,7 @@ public class SalesRequestService {
                 request.requestedAt(),
                 correlationId
         );
+
         ProcessingRequest entity = new ProcessingRequest();
         entity.setRequestId(requestId);
         entity.setCommandType(ProcessingCommandType.SALES);
@@ -80,29 +83,30 @@ public class SalesRequestService {
     }
 
     public void validate(SalesCommand request) {
-        if (request == null)
+        if (request == null) {
             throw new IllegalArgumentException("Заявка не задана");
-
-        if (request.productId() == null)
+        }
+        if (request.productId() == null) {
             throw new IllegalArgumentException("ID товара обязателен");
-
-        if (request.storeId() == null)
+        }
+        if (request.storeId() == null) {
             throw new IllegalArgumentException("ID магазина обязателен");
-
-        if (request.quantity() == null)
-            // если я правильно понимаю, о чем речь
-            throw new IllegalArgumentException("Отсутствует количество товара");
-        if (request.quantity().compareTo(BigDecimal.ZERO) <= 0) // ну всякое же бывает?
-            throw new IllegalArgumentException("Отсутствует количество товара");
-
-        if (request.availableAmount() == null)
-            // если я правильно понимаю, о чем речь х2
-            throw new IllegalArgumentException("Отсутствует доступное количество");
-        if (request.availableAmount().compareTo(BigDecimal.ZERO) <= 0)
-            throw new IllegalArgumentException("Отсутствует доступное количество");
-
-        if (request.requestedAt() == null)
-            throw new IllegalArgumentException("Отсутствует информация о времени запроса");
+        }
+        if (request.quantity() == null) {
+            throw new IllegalArgumentException("Количество товара обязательно");
+        }
+        if (request.quantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Количество товара должно быть больше нуля");
+        }
+        if (request.availableAmount() == null) {
+            throw new IllegalArgumentException("Доступная сумма обязательна");
+        }
+        if (request.availableAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Доступная сумма должна быть больше нуля");
+        }
+        if (request.requestedAt() == null) {
+            throw new IllegalArgumentException("Дата и время запроса обязательны");
+        }
     }
 
     private String toJson(SalesCommand command) {

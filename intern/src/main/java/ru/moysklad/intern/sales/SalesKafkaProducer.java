@@ -1,7 +1,5 @@
 package ru.moysklad.intern.sales;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import ru.moysklad.intern.dto.kafka.SalesCommand;
@@ -19,10 +17,6 @@ import ru.moysklad.intern.kafka.KafkaTopicProperties;
 @Component
 public class SalesKafkaProducer {
 
-    // TODO(student): KafkaTemplate<String, SalesCommand> + KafkaTopicProperties
-
-    // я думаю логгер для ошибок лишним не будет
-    private static final Logger log = LoggerFactory.getLogger(SalesKafkaProducer.class);
     private final KafkaTemplate<String, SalesCommand> kafkaTemplate;
     private final KafkaTopicProperties topics;
 
@@ -31,16 +25,7 @@ public class SalesKafkaProducer {
         this.topics = topics;
     }
 
-    /**
-     * TODO(student): опубликовать SalesCommand в Kafka.
-     */
     public void publish(SalesCommand command) {
-        try {
-            kafkaTemplate.send(topics.getSalesCommands(), command.requestId().toString(), command);
-        } catch (RuntimeException e) {
-            // на всякий
-            log.error("Ошибка при создании публикации SalesCommand: ", e);
-            throw new RuntimeException("Не удалось опубликовать SalesCommand: ", e);
-        }
+        kafkaTemplate.send(topics.getSalesCommands(), command.requestId().toString(), command);
     }
 }

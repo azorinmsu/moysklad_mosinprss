@@ -33,18 +33,18 @@ import tools.jackson.databind.ObjectMapper;
 public class SalesKafkaConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(SalesKafkaConsumer.class);
-    // TODO(student): зависимости и @KafkaListener
+
     private final ProcessingRequestRepository processingRequestRepository;
     private final ObjectMapper objectMapper;
 
-    public SalesKafkaConsumer(ProcessingRequestRepository processingRequestRepository, SalesProcessLauncher processLauncher, ObjectMapper objectMapper) {
+    public SalesKafkaConsumer(
+            ProcessingRequestRepository processingRequestRepository,
+            ObjectMapper objectMapper
+    ) {
         this.processingRequestRepository = processingRequestRepository;
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * TODO(student): обработать входящую SalesCommand.
-     */
     @KafkaListener(
             topics = "${app.kafka.topics.sales-commands}",
             groupId = "${spring.kafka.consumer.group-id}"
@@ -52,10 +52,7 @@ public class SalesKafkaConsumer {
     @Transactional
     public void consume(SalesCommand command) {
         if (processingRequestRepository.findByRequestId(command.requestId()).isPresent()) {
-            log.info(
-                    "Skip Sales command requestId={}",
-                    command.requestId()
-            );
+            log.info("Skip duplicate Sales command requestId={}", command.requestId());
             return;
         }
         createFromCommand(command);
