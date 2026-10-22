@@ -2,6 +2,12 @@
 
 Один Spring Boot-модуль `intern/`: обработка складских остатков, себестоимости и заявок на реализацию товара поверх уже существующей модели серийных номеров.
 
+**Заглушка Remap API 1.2:** [REMAP_STUB.md](REMAP_STUB.md).
+
+**Задание «Обработка заказа покупателя» (Camunda 7.24 + МойСклад):** [ASSIGNMENT_CUSTOMER_ORDER.md](ASSIGNMENT_CUSTOMER_ORDER.md).
+
+Ниже — отдельное задание по `AggregateStock` / Sales.
+
 ---
 
 ## Стек

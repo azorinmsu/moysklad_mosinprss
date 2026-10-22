@@ -156,6 +156,11 @@
 			<artifactId>awaitility</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>ru.moysklad.api</groupId>
+			<artifactId>api-remap-1.2-sdk</artifactId>
+			<version>9.2</version>
+		</dependency>
 	</dependencies>
 
 	<build>
