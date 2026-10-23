@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_CustomerOrderProcessing" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1">
+  <bpmn:message id="Msg_ConfirmDispatch" name="MSG_CONFIRM_DISPATCH" />
+  <bpmn:message id="Msg_RejectDispatch" name="MSG_REJECT_DISPATCH" />
+  <bpmn:message id="Msg_CancelOrder" name="MSG_CANCEL_ORDER" />
+  <bpmn:error id="Err_BusinessValidation" name="BUSINESS_VALIDATION_ERROR" errorCode="BUSINESS_VALIDATION_ERROR" />
+  <bpmn:process id="customer-order-processing" name="Обработка заказа покупателя с резервированием и отгрузкой" isExecutable="true" camunda:historyTimeToLive="30">
+    <bpmn:startEvent id="StartEvent_Order" name="Запуск обработки заказа">
+      <bpmn:outgoing>Flow_StartToStep1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Step1_ValidateOrder" name="Получение и проверка заказа" camunda:asyncBefore="true" camunda:delegateExpression="${validateOrderDelegate}">
+      <bpmn:incoming>Flow_StartToStep1</bpmn:incoming>
+      <bpmn:outgoing>Flow_Step1ToStep2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Step2_CheckStock" name="Проверка остатков" camunda:asyncBefore="true" camunda:delegateExpression="${checkStockDelegate}">
+      <bpmn:incoming>Flow_Step1ToStep2</bpmn:incoming>
+      <bpmn:incoming>Flow_LoopBackToCheckStock</bpmn:incoming>
+      <bpmn:outgoing>Flow_Step2ToStockGateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_StockCheck" name="Остатков достаточно?" default="Flow_StockInsufficient">
+      <bpmn:incoming>Flow_Step2ToStockGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_StockSufficient</bpmn:outgoing>
+      <bpmn:outgoing>Flow_StockInsufficient</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Event_StockRetryTimer" name="Ожидание пополнения остатков">
+      <bpmn:incoming>Flow_StockInsufficient</bpmn:incoming>
+      <bpmn:outgoing>Flow_LoopBackToCheckStock</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_StockRetryDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${stockRetryDuration != null ? stockRetryDuration : 'PT30S'}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Step3_ReserveStock" name="Резервирование остатков" camunda:asyncBefore="true" camunda:delegateExpression="${reserveStockDelegate}">
+      <bpmn:incoming>Flow_StockSufficient</bpmn:incoming>
+      <bpmn:outgoing>Flow_Step3ToStep4Gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Boundary_CompensateReserve" name="Компенсация резерва" attachedToRef="Step3_ReserveStock">
+      <bpmn:compensateEventDefinition id="CompensateReserve_Def" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_CompensateReserve" name="Снять резерв по заказу" isForCompensation="true" camunda:delegateExpression="${releaseReservationDelegate}" />
+    <bpmn:eventBasedGateway id="Gateway_DispatchDecision" name="Ожидание решения по отгрузке">
+      <bpmn:incoming>Flow_Step3ToStep4Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToApprovalCatch</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToRejectCatch</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToDispatchTimeout</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+    <bpmn:intermediateCatchEvent id="Event_DispatchApproved" name="Отгрузка подтверждена">
+      <bpmn:incoming>Flow_ToApprovalCatch</bpmn:incoming>
+      <bpmn:outgoing>Flow_ApprovedToStep5</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Msg_DispatchApproved_Def" messageRef="Msg_ConfirmDispatch" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="Event_DispatchRejected" name="Отгрузка отклонена">
+      <bpmn:incoming>Flow_ToRejectCatch</bpmn:incoming>
+      <bpmn:outgoing>Flow_RejectedToCompensation</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Msg_DispatchRejected_Def" messageRef="Msg_RejectDispatch" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="Event_DispatchTimeout" name="Таймаут ожидания решения">
+      <bpmn:incoming>Flow_ToDispatchTimeout</bpmn:incoming>
+      <bpmn:outgoing>Flow_TimeoutToCompensation</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_DispatchTimeoutDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${dispatchWaitTimeout != null ? dispatchWaitTimeout : 'PT24H'}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateThrowEvent id="Event_TriggerCompensateOnReject" name="Запуск отката резерва">
+      <bpmn:incoming>Flow_RejectedToCompensation</bpmn:incoming>
+      <bpmn:incoming>Flow_TimeoutToCompensation</bpmn:incoming>
+      <bpmn:outgoing>Flow_CompensateToRejectEnd</bpmn:outgoing>
+      <bpmn:compensateEventDefinition id="ThrowCompensate_RejectDef" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:endEvent id="End_Rejected" name="Отклонено / Таймаут">
+      <bpmn:incoming>Flow_CompensateToRejectEnd</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Step5_CreateDemand" name="Создание отгрузки (demand)" camunda:asyncBefore="true" camunda:delegateExpression="${createDemandDelegate}">
+      <bpmn:incoming>Flow_ApprovedToStep5</bpmn:incoming>
+      <bpmn:outgoing>Flow_Step5ToStep6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Boundary_CompensateDemand" name="Компенсация отгрузки" attachedToRef="Step5_CreateDemand">
+      <bpmn:compensateEventDefinition id="CompensateDemand_Def" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_CompensateDemand" name="Удалить/отменить черновик demand" isForCompensation="true" camunda:delegateExpression="${cancelDemandDraftDelegate}" />
+    <bpmn:serviceTask id="Step6_ValidateDemand" name="Проверка отгрузки" camunda:asyncBefore="true" camunda:delegateExpression="${validateDemandDelegate}">
+      <bpmn:incoming>Flow_Step5ToStep6</bpmn:incoming>
+      <bpmn:outgoing>Flow_Step6ToStep7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Boundary_DemandValidationFailed" name="Ошибка сверки" attachedToRef="Step6_ValidateDemand">
+      <bpmn:outgoing>Flow_ValidationFailedToCompensate</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_DemandDef" errorRef="Err_BusinessValidation" />
+    </bpmn:boundaryEvent>
+    <bpmn:intermediateThrowEvent id="Event_TriggerCompensateOnValidationError" name="Откат demand и резерва">
+      <bpmn:incoming>Flow_ValidationFailedToCompensate</bpmn:incoming>
+      <bpmn:outgoing>Flow_ValidationErrorToEnd</bpmn:outgoing>
+      <bpmn:compensateEventDefinition id="ThrowCompensate_ValidationDef" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:endEvent id="End_ValidationFailed" name="Ошибка проверки отгрузки">
+      <bpmn:incoming>Flow_ValidationErrorToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Step7_ConfirmDemand" name="Подтверждение отгрузки" camunda:asyncBefore="true" camunda:delegateExpression="${confirmDemandDelegate}">
+      <bpmn:incoming>Flow_Step6ToStep7</bpmn:incoming>
+      <bpmn:outgoing>Flow_Step7ToStep8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Step8_CompleteOrder" name="Завершение обработки заказа" camunda:asyncBefore="true" camunda:delegateExpression="${completeOrderDelegate}">
+      <bpmn:incoming>Flow_Step7ToStep8</bpmn:incoming>
+      <bpmn:outgoing>Flow_Step8ToEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_Completed" name="Заказ успешно выполнен">
+      <bpmn:incoming>Flow_Step8ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:subProcess id="SubProcess_OrderCancellation" name="Обработка запроса отмены" triggeredByEvent="true">
+      <bpmn:startEvent id="Start_CancelMessage" name="Запрос отмены заказа">
+        <bpmn:outgoing>Flow_CancelStartToCompensate</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="Msg_CancelDef" messageRef="Msg_CancelOrder" />
+      </bpmn:startEvent>
+      <bpmn:intermediateThrowEvent id="Event_CompensateOnCancel" name="Компенсация выполненных шагов">
+        <bpmn:incoming>Flow_CancelStartToCompensate</bpmn:incoming>
+        <bpmn:outgoing>Flow_CompensateToHandleCancellation</bpmn:outgoing>
+        <bpmn:compensateEventDefinition id="ThrowCompensate_CancelDef" />
+      </bpmn:intermediateThrowEvent>
+      <bpmn:serviceTask id="Task_RecordCancellation" name="Фиксация отмены и аудит" camunda:delegateExpression="${handleCancellationDelegate}">
+        <bpmn:incoming>Flow_CompensateToHandleCancellation</bpmn:incoming>
+        <bpmn:outgoing>Flow_RecordToEndCancelled</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:endEvent id="End_Cancelled" name="Процесс отменен">
+        <bpmn:incoming>Flow_RecordToEndCancelled</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_CancelStartToCompensate" sourceRef="Start_CancelMessage" targetRef="Event_CompensateOnCancel" />
+      <bpmn:sequenceFlow id="Flow_CompensateToHandleCancellation" sourceRef="Event_CompensateOnCancel" targetRef="Task_RecordCancellation" />
+      <bpmn:sequenceFlow id="Flow_RecordToEndCancelled" sourceRef="Task_RecordCancellation" targetRef="End_Cancelled" />
+    </bpmn:subProcess>
+    <bpmn:sequenceFlow id="Flow_StartToStep1" sourceRef="StartEvent_Order" targetRef="Step1_ValidateOrder" />
+    <bpmn:sequenceFlow id="Flow_Step1ToStep2" sourceRef="Step1_ValidateOrder" targetRef="Step2_CheckStock" />
+    <bpmn:sequenceFlow id="Flow_Step2ToStockGateway" sourceRef="Step2_CheckStock" targetRef="Gateway_StockCheck" />
+    <bpmn:sequenceFlow id="Flow_StockSufficient" name="Достаточно" sourceRef="Gateway_StockCheck" targetRef="Step3_ReserveStock">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${stockSufficient == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_StockInsufficient" name="Не хватает" sourceRef="Gateway_StockCheck" targetRef="Event_StockRetryTimer" />
+    <bpmn:sequenceFlow id="Flow_LoopBackToCheckStock" sourceRef="Event_StockRetryTimer" targetRef="Step2_CheckStock" />
+    <bpmn:sequenceFlow id="Flow_Step3ToStep4Gateway" sourceRef="Step3_ReserveStock" targetRef="Gateway_DispatchDecision" />
+    <bpmn:sequenceFlow id="Flow_ToApprovalCatch" sourceRef="Gateway_DispatchDecision" targetRef="Event_DispatchApproved" />
+    <bpmn:sequenceFlow id="Flow_ToRejectCatch" sourceRef="Gateway_DispatchDecision" targetRef="Event_DispatchRejected" />
+    <bpmn:sequenceFlow id="Flow_ToDispatchTimeout" sourceRef="Gateway_DispatchDecision" targetRef="Event_DispatchTimeout" />
+    <bpmn:sequenceFlow id="Flow_ApprovedToStep5" sourceRef="Event_DispatchApproved" targetRef="Step5_CreateDemand" />
+    <bpmn:sequenceFlow id="Flow_RejectedToCompensation" sourceRef="Event_DispatchRejected" targetRef="Event_TriggerCompensateOnReject" />
+    <bpmn:sequenceFlow id="Flow_TimeoutToCompensation" sourceRef="Event_DispatchTimeout" targetRef="Event_TriggerCompensateOnReject" />
+    <bpmn:sequenceFlow id="Flow_CompensateToRejectEnd" sourceRef="Event_TriggerCompensateOnReject" targetRef="End_Rejected" />
+    <bpmn:sequenceFlow id="Flow_Step5ToStep6" sourceRef="Step5_CreateDemand" targetRef="Step6_ValidateDemand" />
+    <bpmn:sequenceFlow id="Flow_ValidationFailedToCompensate" sourceRef="Boundary_DemandValidationFailed" targetRef="Event_TriggerCompensateOnValidationError" />
+    <bpmn:sequenceFlow id="Flow_ValidationErrorToEnd" sourceRef="Event_TriggerCompensateOnValidationError" targetRef="End_ValidationFailed" />
+    <bpmn:sequenceFlow id="Flow_Step6ToStep7" sourceRef="Step6_ValidateDemand" targetRef="Step7_ConfirmDemand" />
+    <bpmn:sequenceFlow id="Flow_Step7ToStep8" sourceRef="Step7_ConfirmDemand" targetRef="Step8_CompleteOrder" />
+    <bpmn:sequenceFlow id="Flow_Step8ToEnd" sourceRef="Step8_CompleteOrder" targetRef="End_Completed" />
+    <bpmn:association id="Assoc_CompensateReserve" associationDirection="One" sourceRef="Boundary_CompensateReserve" targetRef="Task_CompensateReserve" />
+    <bpmn:association id="Assoc_CompensateDemand" associationDirection="One" sourceRef="Boundary_CompensateDemand" targetRef="Task_CompensateDemand" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_CustomerOrder">
+    <bpmndi:BPMNPlane id="BPMNPlane_CustomerOrder" bpmnElement="customer-order-processing">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_Order" bpmnElement="StartEvent_Order">
+        <dc:Bounds x="162" y="292" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="136" y="335" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Step1_di" bpmnElement="Step1_ValidateOrder">
+        <dc:Bounds x="250" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Step2_di" bpmnElement="Step2_CheckStock">
+        <dc:Bounds x="390" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_StockCheck_di" bpmnElement="Gateway_StockCheck" isMarkerVisible="true">
+        <dc:Bounds x="535" y="285" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="529" y="255" width="64" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_StockRetryTimer_di" bpmnElement="Event_StockRetryTimer">
+        <dc:Bounds x="542" y="392" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="530" y="435" width="61" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Step3_di" bpmnElement="Step3_ReserveStock">
+        <dc:Bounds x="640" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_CompensateReserve_di" bpmnElement="Task_CompensateReserve">
+        <dc:Bounds x="640" y="400" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_DispatchDecision_di" bpmnElement="Gateway_DispatchDecision">
+        <dc:Bounds x="785" y="285" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="779" y="335" width="61" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_DispatchApproved_di" bpmnElement="Event_DispatchApproved">
+        <dc:Bounds x="882" y="292" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="863" y="335" width="74" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_DispatchRejected_di" bpmnElement="Event_DispatchRejected">
+        <dc:Bounds x="882" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="874" y="225" width="53" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_DispatchTimeout_di" bpmnElement="Event_DispatchTimeout">
+        <dc:Bounds x="882" y="122" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="874" y="80" width="51" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_TriggerCompensateOnReject_di" bpmnElement="Event_TriggerCompensateOnReject">
+        <dc:Bounds x="972" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="955" y="195" width="71" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rejected_di" bpmnElement="End_Rejected">
+        <dc:Bounds x="1062" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1050" y="195" width="62" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Step5_di" bpmnElement="Step5_CreateDemand">
+        <dc:Bounds x="980" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_CompensateDemand_di" bpmnElement="Task_CompensateDemand">
+        <dc:Bounds x="980" y="400" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Step6_di" bpmnElement="Step6_ValidateDemand">
+        <dc:Bounds x="1140" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_TriggerCompensateOnValidationError_di" bpmnElement="Event_TriggerCompensateOnValidationError">
+        <dc:Bounds x="1172" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1150" y="115" width="82" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_ValidationFailed_di" bpmnElement="End_ValidationFailed">
+        <dc:Bounds x="1272" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1267" y="195" width="48" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Step7_di" bpmnElement="Step7_ConfirmDemand">
+        <dc:Bounds x="1300" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Step8_di" bpmnElement="Step8_CompleteOrder">
+        <dc:Bounds x="1460" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Completed_di" bpmnElement="End_Completed">
+        <dc:Bounds x="1622" y="292" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1602" y="335" width="76" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_OrderCancellation_di" bpmnElement="SubProcess_OrderCancellation" isExpanded="true">
+        <dc:Bounds x="250" y="520" width="580" height="180" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_CancelMessage_di" bpmnElement="Start_CancelMessage">
+        <dc:Bounds x="290" y="592" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="269" y="635" width="79" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_CompensateOnCancel_di" bpmnElement="Event_CompensateOnCancel">
+        <dc:Bounds x="392" y="592" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="375" y="635" width="70" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RecordCancellation_di" bpmnElement="Task_RecordCancellation">
+        <dc:Bounds x="490" y="570" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Cancelled_di" bpmnElement="End_Cancelled">
+        <dc:Bounds x="652" y="592" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="625" y="635" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_CancelStartToCompensate_di" bpmnElement="Flow_CancelStartToCompensate">
+        <di:waypoint x="326" y="610" />
+        <di:waypoint x="392" y="610" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CompensateToHandleCancellation_di" bpmnElement="Flow_CompensateToHandleCancellation">
+        <di:waypoint x="428" y="610" />
+        <di:waypoint x="490" y="610" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RecordToEndCancelled_di" bpmnElement="Flow_RecordToEndCancelled">
+        <di:waypoint x="590" y="610" />
+        <di:waypoint x="652" y="610" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Boundary_DemandValidationFailed_di" bpmnElement="Boundary_DemandValidationFailed">
+        <dc:Bounds x="1172" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1191" y="216" width="49" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_CompensateDemand_di" bpmnElement="Boundary_CompensateDemand">
+        <dc:Bounds x="1012" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="948" y="368" width="69" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_CompensateReserve_di" bpmnElement="Boundary_CompensateReserve">
+        <dc:Bounds x="672" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="608" y="368" width="69" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_StartToStep1_di" bpmnElement="Flow_StartToStep1">
+        <di:waypoint x="198" y="310" />
+        <di:waypoint x="250" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Step1ToStep2_di" bpmnElement="Flow_Step1ToStep2">
+        <di:waypoint x="350" y="310" />
+        <di:waypoint x="390" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Step2ToStockGateway_di" bpmnElement="Flow_Step2ToStockGateway">
+        <di:waypoint x="490" y="310" />
+        <di:waypoint x="535" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_StockSufficient_di" bpmnElement="Flow_StockSufficient">
+        <di:waypoint x="585" y="310" />
+        <di:waypoint x="640" y="310" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="582" y="292" width="59" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_StockInsufficient_di" bpmnElement="Flow_StockInsufficient">
+        <di:waypoint x="560" y="335" />
+        <di:waypoint x="560" y="392" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="562" y="341" width="48" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LoopBackToCheckStock_di" bpmnElement="Flow_LoopBackToCheckStock">
+        <di:waypoint x="542" y="410" />
+        <di:waypoint x="440" y="410" />
+        <di:waypoint x="440" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Step3ToStep4Gateway_di" bpmnElement="Flow_Step3ToStep4Gateway">
+        <di:waypoint x="740" y="310" />
+        <di:waypoint x="785" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToApprovalCatch_di" bpmnElement="Flow_ToApprovalCatch">
+        <di:waypoint x="835" y="310" />
+        <di:waypoint x="882" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRejectCatch_di" bpmnElement="Flow_ToRejectCatch">
+        <di:waypoint x="810" y="285" />
+        <di:waypoint x="810" y="200" />
+        <di:waypoint x="882" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToDispatchTimeout_di" bpmnElement="Flow_ToDispatchTimeout">
+        <di:waypoint x="810" y="285" />
+        <di:waypoint x="810" y="140" />
+        <di:waypoint x="882" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ApprovedToStep5_di" bpmnElement="Flow_ApprovedToStep5">
+        <di:waypoint x="918" y="310" />
+        <di:waypoint x="980" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RejectedToCompensation_di" bpmnElement="Flow_RejectedToCompensation">
+        <di:waypoint x="918" y="200" />
+        <di:waypoint x="945" y="200" />
+        <di:waypoint x="945" y="170" />
+        <di:waypoint x="972" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_TimeoutToCompensation_di" bpmnElement="Flow_TimeoutToCompensation">
+        <di:waypoint x="918" y="140" />
+        <di:waypoint x="945" y="140" />
+        <di:waypoint x="945" y="170" />
+        <di:waypoint x="972" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CompensateToRejectEnd_di" bpmnElement="Flow_CompensateToRejectEnd">
+        <di:waypoint x="1008" y="170" />
+        <di:waypoint x="1062" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Step5ToStep6_di" bpmnElement="Flow_Step5ToStep6">
+        <di:waypoint x="1080" y="310" />
+        <di:waypoint x="1140" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ValidationFailedToCompensate_di" bpmnElement="Flow_ValidationFailedToCompensate">
+        <di:waypoint x="1190" y="252" />
+        <di:waypoint x="1190" y="188" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ValidationErrorToEnd_di" bpmnElement="Flow_ValidationErrorToEnd">
+        <di:waypoint x="1208" y="170" />
+        <di:waypoint x="1272" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Step6ToStep7_di" bpmnElement="Flow_Step6ToStep7">
+        <di:waypoint x="1240" y="310" />
+        <di:waypoint x="1300" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Step7ToStep8_di" bpmnElement="Flow_Step7ToStep8">
+        <di:waypoint x="1400" y="310" />
+        <di:waypoint x="1460" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Step8ToEnd_di" bpmnElement="Flow_Step8ToEnd">
+        <di:waypoint x="1560" y="310" />
+        <di:waypoint x="1622" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_CompensateReserve_di" bpmnElement="Assoc_CompensateReserve">
+        <di:waypoint x="690" y="368" />
+        <di:waypoint x="690" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_CompensateDemand_di" bpmnElement="Assoc_CompensateDemand">
+        <di:waypoint x="1030" y="368" />
+        <di:waypoint x="1030" y="400" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
