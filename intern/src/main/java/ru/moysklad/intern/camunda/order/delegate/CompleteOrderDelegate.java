@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 @Component(CompleteOrderDelegate.BEAN_NAME)
 public class CompleteOrderDelegate implements JavaDelegate {
-    public static final String BEAN_NAME = "confirmDemandDelegate";
+    public static final String BEAN_NAME = "completeOrderDelegate";
 
     @Override
     public void execute(DelegateExecution execution) throws Exception {
