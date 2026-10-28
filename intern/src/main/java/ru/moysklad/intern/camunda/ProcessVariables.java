@@ -22,6 +22,11 @@ public final class ProcessVariables {
     public static final String IRREVERSIBLE = "irreversible";
     public static final String FINAL_STATUS = "finalStatus";
     public static final String ERROR_REASON = "errorReason";
+    public static final String CURRENT_STAGE = "currentStage";
+    public static final String OUTCOME = "outcome";
+    public static final String STOCK_RETRY_COUNT = "stockRetryCount";
+    public static final String RESERVED = "reserved";
+    public static final String COMPENSATION_STATUS = "compensationStatus";
 
     private ProcessVariables() {
     }

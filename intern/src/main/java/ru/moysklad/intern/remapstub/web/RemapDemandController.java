@@ -34,6 +34,14 @@ public class RemapDemandController {
         return demandService.create(body);
     }
 
+    @GetMapping({"", "/"})
+    public Map<String, Object> list(
+            @RequestParam(required = false) String filter,
+            @RequestParam(required = false) String expand
+    ) {
+        return demandService.list(filter, RemapQuerySupport.expandPositions(expand));
+    }
+
     @GetMapping("/{id}")
     public Map<String, Object> getById(
             @PathVariable UUID id,
