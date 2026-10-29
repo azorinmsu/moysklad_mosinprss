@@ -182,6 +182,9 @@ build/
 ### Local tooling (JDK/Maven caches used by agents)
 .tools/
 
+### Instructor solutions (never publish)
+/instructor_solutions/
+
 ### Some additional ignores (sort later)
 *.DS_Store
 *.sw?

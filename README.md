@@ -6,6 +6,8 @@
 
 **Задание «Обработка заказа покупателя» (Camunda 7.24 + МойСклад):** [ASSIGNMENT_CUSTOMER_ORDER.md](ASSIGNMENT_CUSTOMER_ORDER.md).
 
+**Лабораторная «Паттерны проектирования при расчёте заказа покупателя» (Strategy, Factory, Chain of Responsibility, Decorator):** [lab/design-patterns/ASSIGNMENT.md](lab/design-patterns/ASSIGNMENT.md). Код — пакет `ru.moysklad.intern.patterns`, unit-тесты без Docker.
+
 Ниже — отдельное задание по `AggregateStock` / Sales.
 
 ---
