@@ -161,6 +161,7 @@
 			<artifactId>api-remap-1.2-sdk</artifactId>
 			<version>9.2</version>
 		</dependency>
+
 	</dependencies>
 
 	<build>

@@ -27,6 +27,6 @@ public interface ProcessingRequestRepository extends JpaRepository<ProcessingReq
             order by created_at asc
             limit 1
             for update skip locked
-            """, nativeQuery = true)
+            """, nativeQuery = true) // попробовать оптимистичную блокировку?
     Optional<ProcessingRequest> claimNextPendingSale();
 }
