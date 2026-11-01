@@ -8,6 +8,8 @@
 
 **Лабораторная «Паттерны проектирования при расчёте заказа покупателя» (Strategy, Factory, Chain of Responsibility, Decorator):** [lab/design-patterns/ASSIGNMENT.md](lab/design-patterns/ASSIGNMENT.md). Код — пакет `ru.moysklad.intern.patterns`, unit-тесты без Docker.
 
+**Лабораторная «Архитектура обработки ERP-документов с использованием паттернов проектирования» (Factory Method, Abstract Factory, Strategy, Chain of Responsibility, Template Method, Decorator, Command, State, Observer, Builder):** [lab/document-patterns/README.md](lab/document-patterns/README.md). Код — пакет `ru.moysklad.intern.documentpatterns`, unit-тесты без Docker.
+
 Ниже — отдельное задание по `AggregateStock` / Sales.
 
 ---
