@@ -19,10 +19,21 @@ import ru.moysklad.intern.patterns.model.CustomerType;
 public class DiscountStrategyFactory {
 
     public DiscountStrategy create(CustomerType customerType) {
-        // TODO:
-        // 1. Определить тип покупателя.
-        // 2. Выбрать соответствующую стратегию.
-        // 3. Обработать неподдерживаемый тип.
-        throw new UnsupportedOperationException("TODO");
+        if (customerType == null)
+            throw new IllegalArgumentException("Тип покупателя не может быть нулевым");
+
+        switch (customerType) {
+            case REGULAR -> {
+                return new RegularDiscountStrategy();
+            }
+            case WHOLESALE -> {
+                return new WholesaleDiscountStrategy();
+            }
+            case VIP -> {
+                return new VipDiscountStrategy();
+            }
+            case CORPORATE -> throw new UnsupportedCustomerTypeException(customerType); // не поддерживается
+            default -> throw new UnsupportedCustomerTypeException(customerType);
+        }
     }
 }

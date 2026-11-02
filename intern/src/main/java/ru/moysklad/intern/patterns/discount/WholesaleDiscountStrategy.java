@@ -15,12 +15,12 @@ public class WholesaleDiscountStrategy implements DiscountStrategy {
 
     @Override
     public BigDecimal calculateDiscount(BigDecimal subtotal) {
-        // TODO:
-        //  1. Проверить subtotal по контракту DiscountStrategy.
-        //  2. Если subtotal ниже THRESHOLD — скидки нет.
-        //  3. Если subtotal равен THRESHOLD или выше — скидка RATE от subtotal.
-        //  4. Округлить результат по единому правилу Money.
-        //  Подсказка: сравнивайте BigDecimal через compareTo, а не equals.
-        throw new UnsupportedOperationException("TODO");
+        if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) < 0)
+            throw new IllegalArgumentException("Стоимость товаров не может быть нулевой или отрицательной");
+
+        if (subtotal.compareTo(THRESHOLD) >= 0)
+            return Money.round(subtotal.multiply(RATE));
+        else
+            return Money.ZERO;
     }
 }

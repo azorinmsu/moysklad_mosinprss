@@ -1,5 +1,7 @@
 package ru.moysklad.intern.patterns.discount;
 
+import ru.moysklad.intern.patterns.model.Money;
+
 import java.math.BigDecimal;
 
 /**
@@ -11,10 +13,8 @@ public class VipDiscountStrategy implements DiscountStrategy {
 
     @Override
     public BigDecimal calculateDiscount(BigDecimal subtotal) {
-        // TODO:
-        //  1. Проверить subtotal по контракту DiscountStrategy.
-        //  2. Рассчитать RATE от subtotal.
-        //  3. Округлить результат по единому правилу Money.
-        throw new UnsupportedOperationException("TODO");
+        if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) < 0)
+            throw new IllegalArgumentException("Стоимость товаров не может быть нулевой или отрицательной");
+        return Money.round(subtotal.multiply(RATE));
     }
 }
