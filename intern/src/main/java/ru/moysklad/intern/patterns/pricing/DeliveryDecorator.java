@@ -1,6 +1,7 @@
 package ru.moysklad.intern.patterns.pricing;
 
 import ru.moysklad.intern.patterns.model.AdditionalService;
+import ru.moysklad.intern.patterns.model.Money;
 import ru.moysklad.intern.patterns.model.OrderDraft;
 
 import java.math.BigDecimal;
@@ -16,10 +17,6 @@ public class DeliveryDecorator extends PriceCalculatorDecorator {
 
     @Override
     public BigDecimal calculate(OrderDraft order) {
-        // TODO:
-        // 1. Получить стоимость от delegate.
-        // 2. Добавить стоимость доставки (service.price()).
-        // 3. Вернуть результат, округлённый по правилу Money.
-        throw new UnsupportedOperationException("TODO");
+        return Money.round(delegate.calculate(order).add(service.price()));
     }
 }
