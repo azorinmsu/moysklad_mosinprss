@@ -1,0 +1,67 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-order-process-state
+      author: me
+      changes:
+        - createTable:
+            tableName: order_process_states
+            columns:
+              - column:
+                  name: order_id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: process_instance_id
+                  type: VARCHAR(64)
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_stage
+                  type: VARCHAR(32)
+              - column:
+                  name: demand_id
+                  type: UUID
+              - column:
+                  name: reserved
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+                  defaultValueBoolean: false
+              - column:
+                  name: irreversible
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+                  defaultValueBoolean: false
+              - column:
+                  name: error_reason
+                  type: VARCHAR(1024)
+              - column:
+                  name: version
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                  defaultValueNumeric: 0
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - createIndex:
+            tableName: order_process_states
+            indexName: idx_order_process_instance_id
+            columns:
+              - column:
+                  name: process_instance_id

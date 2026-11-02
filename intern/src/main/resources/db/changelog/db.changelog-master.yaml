@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/changes/004-aggregate-stock.yaml
   - include:
       file: db/changelog/changes/005-remap-stub.yaml
+  - include:
+      file: db/changelog/changes/006-order-process.yaml

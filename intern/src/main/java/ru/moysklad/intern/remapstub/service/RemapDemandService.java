@@ -96,6 +96,42 @@ public class RemapDemandService {
     }
 
     @Transactional(readOnly = true)
+    public Map<String, Object> list(String filter, boolean expandPositions) {
+        List<StubDemand> demands;
+        if (filter != null && filter.contains("customerOrder")) {
+            UUID orderId = null;
+            String[] parts = filter.split("=");
+            if (parts.length > 1) {
+                String val = parts[1].trim();
+                int lastSlash = val.lastIndexOf('/');
+                String uuidStr = lastSlash >= 0 ? val.substring(lastSlash + 1) : val;
+                int sep = uuidStr.indexOf(';');
+                if (sep >= 0) {
+                    uuidStr = uuidStr.substring(0, sep);
+                }
+                try {
+                    orderId = UUID.fromString(uuidStr.trim());
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            if (orderId != null) {
+                demands = demandRepository.findByCustomerOrderId(orderId);
+            } else {
+                demands = demandRepository.findAll();
+            }
+        } else {
+            demands = demandRepository.findAll();
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (StubDemand demand : demands) {
+            List<StubDemandPosition> positions = demandPositionRepository.findByDemandIdOrderByIdAsc(demand.getId());
+            rows.add(jsonMapper.demand(demand, positions, expandPositions));
+        }
+        return metaFactory.listEntity("demand", "/entity/demand", rows);
+    }
+
+    @Transactional(readOnly = true)
     public Map<String, Object> getById(UUID id, boolean expandPositions) {
         StubDemand demand = requireDemand(id);
         List<StubDemandPosition> positions = demandPositionRepository.findByDemandIdOrderByIdAsc(id);
