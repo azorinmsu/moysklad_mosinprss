@@ -9,10 +9,9 @@ public class EmptyOrderValidator extends AbstractOrderValidator {
 
     @Override
     public void validate(OrderDraft order) {
-        // TODO:
-        // Проверить, что заказ содержит хотя бы одну позицию.
-        // При нарушении — OrderValidationException с кодом EMPTY_ORDER,
-        // иначе передать заказ следующему звену.
-        throw new UnsupportedOperationException("TODO");
+        if (order.items() == null || order.items().isEmpty()) {
+            throw new OrderValidationException(ValidationErrorCode.EMPTY_ORDER, "Заказ не может быть пустым");
+        }
+        passToNext(order);
     }
 }

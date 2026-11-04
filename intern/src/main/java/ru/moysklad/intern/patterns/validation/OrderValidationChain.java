@@ -26,11 +26,11 @@ public class OrderValidationChain {
      * </ol>
      */
     public static OrderValidationChain createDefault() {
-        // TODO:
-        // 1. Создать звенья.
-        // 2. Связать их в указанном порядке через AbstractOrderValidator#linkWith.
-        // 3. Вернуть цепочку, начинающуюся с первого звена.
-        throw new UnsupportedOperationException("TODO");
+        EmptyOrderValidator emptyOrderValidator = new EmptyOrderValidator();
+        emptyOrderValidator.linkWith(new QuantityValidator())
+                .linkWith(new PriceValidator())
+                .linkWith(new TotalAmountValidator());
+        return new OrderValidationChain(emptyOrderValidator);
     }
 
     public void validate(OrderDraft order) {

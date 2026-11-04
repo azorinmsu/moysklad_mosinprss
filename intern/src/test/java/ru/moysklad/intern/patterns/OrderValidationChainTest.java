@@ -1,10 +1,19 @@
 package ru.moysklad.intern.patterns;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ru.moysklad.intern.patterns.model.CustomerType;
+import ru.moysklad.intern.patterns.model.OrderDraft;
+import ru.moysklad.intern.patterns.validation.EmptyOrderValidator;
+import ru.moysklad.intern.patterns.validation.OrderValidationChain;
+import ru.moysklad.intern.patterns.validation.OrderValidationException;
+import ru.moysklad.intern.patterns.validation.ValidationErrorCode;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Задание 3. Chain of Responsibility — проверки заказа.
@@ -13,71 +22,100 @@ import static org.junit.jupiter.api.Assertions.fail;
 class OrderValidationChainTest {
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Пустой заказ → EMPTY_ORDER")
     void emptyOrderIsRejected() {
-        // TODO: OrderValidationChain.createDefault().validate(createEmptyOrder()) → код EMPTY_ORDER
-        fail("TODO: implement test");
+        OrderValidationChain chain = OrderValidationChain.createDefault();
+        assertThatThrownBy(() -> chain.validate(OrderTestData.createEmptyOrder()))
+                .isInstanceOf(OrderValidationException.class)
+                .satisfies(e -> assertThat(((OrderValidationException) e).getCode())
+                        .isEqualTo(ValidationErrorCode.EMPTY_ORDER));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Нулевое количество → INVALID_QUANTITY")
     void zeroQuantityIsRejected() {
-        // TODO: createOrderWithInvalidQuantity() → код INVALID_QUANTITY
-        fail("TODO: implement test");
+        OrderValidationChain chain = OrderValidationChain.createDefault();
+        assertThatThrownBy(() -> chain.validate(OrderTestData.createOrderWithInvalidQuantity()))
+                .isInstanceOf(OrderValidationException.class)
+                .satisfies(e -> assertThat(((OrderValidationException) e).getCode())
+                        .isEqualTo(ValidationErrorCode.INVALID_QUANTITY));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Отрицательное количество → INVALID_QUANTITY")
     void negativeQuantityIsRejected() {
-        // TODO: createOrderWithNegativeQuantity() → код INVALID_QUANTITY, в сообщении есть наименование товара
-        fail("TODO: implement test");
+        OrderValidationChain chain = OrderValidationChain.createDefault();
+        assertThatThrownBy(() -> chain.validate(OrderTestData.createOrderWithNegativeQuantity()))
+                .isInstanceOf(OrderValidationException.class)
+                .satisfies(e -> {
+                    OrderValidationException ex = (OrderValidationException) e;
+                    assertThat(ex.getCode()).isEqualTo(ValidationErrorCode.INVALID_QUANTITY);
+                    assertThat(ex.getMessage()).contains("Ручка гелевая");
+                });
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Отрицательная цена → INVALID_PRICE")
     void negativePriceIsRejected() {
-        // TODO: createOrderWithNegativePrice() → код INVALID_PRICE
-        fail("TODO: implement test");
+        OrderValidationChain chain = OrderValidationChain.createDefault();
+        assertThatThrownBy(() -> chain.validate(OrderTestData.createOrderWithNegativePrice()))
+                .isInstanceOf(OrderValidationException.class)
+                .satisfies(e -> assertThat(((OrderValidationException) e).getCode())
+                        .isEqualTo(ValidationErrorCode.INVALID_PRICE));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Превышение 1 000 000 ₽ → TOTAL_AMOUNT_EXCEEDED, ровно 1 000 000 ₽ допустимо")
     void totalAmountLimitIsEnforced() {
-        // TODO: createOrderExceedingMaxAmount() → код TOTAL_AMOUNT_EXCEEDED;
-        //  createOrderAtMaxAmount() проходит без исключения
-        fail("TODO: implement test");
+        OrderValidationChain chain = OrderValidationChain.createDefault();
+        assertThatThrownBy(() -> chain.validate(OrderTestData.createOrderExceedingMaxAmount()))
+                .isInstanceOf(OrderValidationException.class)
+                .satisfies(e -> assertThat(((OrderValidationException) e).getCode())
+                        .isEqualTo(ValidationErrorCode.TOTAL_AMOUNT_EXCEEDED));
+
+        assertThatCode(() -> chain.validate(OrderTestData.createOrderAtMaxAmount()))
+                .doesNotThrowAnyException();
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Корректный заказ проходит все проверки")
     void validOrderPasses() {
-        // TODO: createRegularOrder(), createWholesaleOrder(), createVipOrder() проходят без исключения
-        fail("TODO: implement test");
+        OrderValidationChain chain = OrderValidationChain.createDefault();
+        assertThatCode(() -> chain.validate(OrderTestData.createRegularOrder()))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> chain.validate(OrderTestData.createWholesaleOrder()))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> chain.validate(OrderTestData.createVipOrder()))
+                .doesNotThrowAnyException();
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("После ошибки следующие звенья не вызываются")
     void chainStopsAfterFirstError() {
-        // TODO:
-        //  1. Собрать цепочку EmptyOrderValidator → RecordingOrderValidator.
-        //  2. Пустой заказ → OrderValidationException, RecordingOrderValidator.wasInvoked() == false.
-        //  3. Корректный заказ → RecordingOrderValidator.wasInvoked() == true.
-        fail("TODO: implement test");
+        EmptyOrderValidator emptyValidator = new EmptyOrderValidator();
+        RecordingOrderValidator recordingValidator = emptyValidator.linkWith(new RecordingOrderValidator());
+
+        assertThatThrownBy(() -> emptyValidator.validate(OrderTestData.createEmptyOrder()))
+                .isInstanceOf(OrderValidationException.class);
+        assertThat(recordingValidator.wasInvoked()).isFalse();
+
+        emptyValidator.validate(OrderTestData.createRegularOrder());
+        assertThat(recordingValidator.wasInvoked()).isTrue();
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Порядок звеньев: первым срабатывает раннее правило")
     void validatorsRunInDefinedOrder() {
-        // TODO: заказ с отрицательной ценой и нулевым количеством одновременно
-        //  → код INVALID_QUANTITY (QuantityValidator стоит раньше PriceValidator)
-        fail("TODO: implement test");
+        OrderDraft order = OrderTestData.order(
+                CustomerType.REGULAR,
+                Set.of(),
+                OrderTestData.item("Тест", "-100", "0")
+        );
+        OrderValidationChain chain = OrderValidationChain.createDefault();
+
+        assertThatThrownBy(() -> chain.validate(order))
+                .isInstanceOf(OrderValidationException.class)
+                .satisfies(e -> assertThat(((OrderValidationException) e).getCode())
+                        .isEqualTo(ValidationErrorCode.INVALID_QUANTITY));
     }
 }

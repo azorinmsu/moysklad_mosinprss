@@ -1,5 +1,7 @@
 package ru.moysklad.intern.patterns.discount;
 
+import ru.moysklad.intern.patterns.model.Money;
+
 import java.math.BigDecimal;
 
 /**
@@ -9,8 +11,8 @@ public class RegularDiscountStrategy implements DiscountStrategy {
 
     @Override
     public BigDecimal calculateDiscount(BigDecimal subtotal) {
-        // TODO: Обычный покупатель не получает скидку.
-        //  Проверьте входной subtotal по контракту DiscountStrategy и верните 0.00 с единым правилом округления.
-        throw new UnsupportedOperationException("TODO");
+        if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) < 0)
+            throw new IllegalArgumentException("Стоимость товаров не может быть нулевой или отрицательной");
+        return Money.ZERO;
     }
 }

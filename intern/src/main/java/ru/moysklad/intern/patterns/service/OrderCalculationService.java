@@ -1,10 +1,18 @@
 package ru.moysklad.intern.patterns.service;
 
+import ru.moysklad.intern.patterns.discount.DiscountStrategy;
 import ru.moysklad.intern.patterns.discount.DiscountStrategyFactory;
+import ru.moysklad.intern.patterns.model.AdditionalService;
+import ru.moysklad.intern.patterns.model.Money;
 import ru.moysklad.intern.patterns.model.OrderCalculation;
 import ru.moysklad.intern.patterns.model.OrderDraft;
+import ru.moysklad.intern.patterns.pricing.BasePriceCalculator;
+import ru.moysklad.intern.patterns.pricing.DeliveryDecorator;
+import ru.moysklad.intern.patterns.pricing.PackagingDecorator;
+import ru.moysklad.intern.patterns.pricing.PriceCalculator;
 import ru.moysklad.intern.patterns.validation.OrderValidationChain;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 
 /**
@@ -25,13 +33,42 @@ public class OrderCalculationService {
     }
 
     public OrderCalculation calculate(OrderDraft order) {
-        // TODO:
-        // 1. Выполнить цепочку проверок.
-        // 2. Получить стратегию скидки из фабрики.
-        // 3. Создать базовый калькулятор.
-        // 4. Добавить выбранные декораторы.
-        // 5. Рассчитать итоговую стоимость.
-        // 6. Вернуть результат расчёта.
-        throw new UnsupportedOperationException("TODO");
+
+        validationChain.validate(order); // проверяем заказ
+        // скидка
+        DiscountStrategy strategy = discountStrategyFactory.create(order.customerType());
+        // калькулятор
+        PriceCalculator calc = new BasePriceCalculator(strategy);
+
+        if (order.hasService(AdditionalService.DELIVERY))
+            calc = new DeliveryDecorator(calc);
+        if (order.hasService(AdditionalService.GIFT_PACKAGING))
+            calc = new PackagingDecorator(calc);
+
+        BigDecimal subtotal = order.subtotal();
+        BigDecimal discount = strategy.calculateDiscount(subtotal);
+        BigDecimal subtotalWithDiscount =
+                Money.round(subtotal.subtract(discount)); // чтобы была гарантия, что у нас точно 2 знака после запятой
+        BigDecimal deliveryCost =
+                order.hasService(AdditionalService.DELIVERY) ?
+                        AdditionalService.DELIVERY.price()
+                        : Money.ZERO;
+
+        BigDecimal packingCost =
+                order.hasService(AdditionalService.GIFT_PACKAGING) ?
+                        AdditionalService.GIFT_PACKAGING.price()
+                        : Money.ZERO;
+
+        // и напоследок
+        BigDecimal total = calc.calculate(order);
+
+        return new OrderCalculation(
+                subtotal,
+                discount,
+                subtotalWithDiscount,
+                deliveryCost,
+                packingCost,
+                total
+        );
     }
 }

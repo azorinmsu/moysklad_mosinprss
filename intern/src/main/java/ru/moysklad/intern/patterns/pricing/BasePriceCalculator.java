@@ -1,6 +1,7 @@
 package ru.moysklad.intern.patterns.pricing;
 
 import ru.moysklad.intern.patterns.discount.DiscountStrategy;
+import ru.moysklad.intern.patterns.model.Money;
 import ru.moysklad.intern.patterns.model.OrderDraft;
 
 import java.math.BigDecimal;
@@ -19,11 +20,8 @@ public class BasePriceCalculator implements PriceCalculator {
 
     @Override
     public BigDecimal calculate(OrderDraft order) {
-        // TODO:
-        // 1. Получить стоимость товаров заказа (OrderDraft#subtotal).
-        // 2. Рассчитать скидку через discountStrategy.
-        // 3. Вернуть стоимость товаров за вычетом скидки, округлённую по правилу Money.
-        // Стоимость услуг здесь не учитывается — её добавляют декораторы.
-        throw new UnsupportedOperationException("TODO");
+        BigDecimal subtotal = order.subtotal();
+        BigDecimal discount = discountStrategy.calculateDiscount(subtotal);
+        return Money.round(subtotal.subtract(discount)); // вычитаем саму скидку
     }
 }

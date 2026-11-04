@@ -1,6 +1,9 @@
 package ru.moysklad.intern.patterns.validation;
 
 import ru.moysklad.intern.patterns.model.OrderDraft;
+import ru.moysklad.intern.patterns.model.OrderItem;
+
+import java.math.BigDecimal;
 
 /**
  * Правило 2: количество каждой позиции задано и строго больше нуля.
@@ -10,11 +13,14 @@ public class QuantityValidator extends AbstractOrderValidator {
 
     @Override
     public void validate(OrderDraft order) {
-        // TODO:
-        // 1. Перебрать позиции заказа.
-        // 2. Если количество не задано, равно нулю или отрицательное — OrderValidationException
-        //    с кодом INVALID_QUANTITY и наименованием товара в сообщении.
-        // 3. Если все позиции корректны — передать заказ следующему звену.
-        throw new UnsupportedOperationException("TODO");
+        for (OrderItem pos : order.items()) {
+            if (pos.quantity() == null || pos.quantity().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new OrderValidationException(
+                        ValidationErrorCode.INVALID_QUANTITY,
+                        "Некорректное количество для товара: " + pos.productName()
+                );
+            }
+        }
+        passToNext(order);
     }
 }
