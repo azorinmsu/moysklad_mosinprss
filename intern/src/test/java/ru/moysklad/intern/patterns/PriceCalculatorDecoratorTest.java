@@ -1,10 +1,18 @@
 package ru.moysklad.intern.patterns;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ru.moysklad.intern.patterns.discount.RegularDiscountStrategy;
+import ru.moysklad.intern.patterns.discount.VipDiscountStrategy;
+import ru.moysklad.intern.patterns.model.OrderDraft;
+import ru.moysklad.intern.patterns.pricing.BasePriceCalculator;
+import ru.moysklad.intern.patterns.pricing.DeliveryDecorator;
+import ru.moysklad.intern.patterns.pricing.PackagingDecorator;
+import ru.moysklad.intern.patterns.pricing.PriceCalculator;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static ru.moysklad.intern.patterns.OrderTestData.rub;
 
 /**
  * Задание 4. Decorator — дополнительные услуги.
@@ -14,59 +22,60 @@ import static org.junit.jupiter.api.Assertions.fail;
 class PriceCalculatorDecoratorTest {
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Без услуг: стоимость товаров после скидки")
     void baseCalculatorWithoutServices() {
-        // TODO: BasePriceCalculator(RegularDiscountStrategy) для createRegularOrder() → 2 500.00
-        fail("TODO: implement test");
+        PriceCalculator base = new BasePriceCalculator(new RegularDiscountStrategy());
+        assertThat(base.calculate(OrderTestData.createRegularOrder())).isEqualTo(rub("2500.00"));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Только доставка: +500 ₽")
     void deliveryOnly() {
-        // TODO: DeliveryDecorator(base) для заказа на 2 500 ₽ → 3 000.00
-        fail("TODO: implement test");
+        PriceCalculator base = new BasePriceCalculator(new RegularDiscountStrategy());
+        PriceCalculator withDelivery = new DeliveryDecorator(base);
+        assertThat(withDelivery.calculate(OrderTestData.createRegularOrder())).isEqualTo(rub("3000.00"));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Только упаковка: +200 ₽")
     void packagingOnly() {
-        // TODO: PackagingDecorator(base) для заказа на 2 500 ₽ → 2 700.00
-        fail("TODO: implement test");
+        PriceCalculator base = new BasePriceCalculator(new RegularDiscountStrategy());
+        PriceCalculator withPackaging = new PackagingDecorator(base);
+        assertThat(withPackaging.calculate(OrderTestData.createRegularOrder())).isEqualTo(rub("2700.00"));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Доставка + упаковка: +700 ₽")
     void deliveryAndPackaging() {
-        // TODO: PackagingDecorator(DeliveryDecorator(base)) для заказа на 2 500 ₽ → 3 200.00
-        fail("TODO: implement test");
+        PriceCalculator base = new BasePriceCalculator(new RegularDiscountStrategy());
+        PriceCalculator calculator = new PackagingDecorator(new DeliveryDecorator(base));
+        assertThat(calculator.calculate(OrderTestData.createRegularOrder())).isEqualTo(rub("3200.00"));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Порядок фиксированных надбавок не влияет на итог")
     void decoratorOrderDoesNotMatter() {
-        // TODO: Packaging(Delivery(base)) и Delivery(Packaging(base)) дают одинаковую сумму
-        fail("TODO: implement test");
+        PriceCalculator base = new BasePriceCalculator(new RegularDiscountStrategy());
+        PriceCalculator order1 = new PackagingDecorator(new DeliveryDecorator(base));
+        PriceCalculator order2 = new DeliveryDecorator(new PackagingDecorator(base));
+        OrderDraft order = OrderTestData.createRegularOrder();
+        assertThat(order1.calculate(order)).isEqualTo(order2.calculate(order));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Скидка применяется только к товарам, не к услугам")
     void discountIsNotAppliedToServices() {
-        // TODO: VIP-заказ на 25 000 ₽: Packaging(Delivery(BasePriceCalculator(VipDiscountStrategy)))
-        //  → 21 250 + 500 + 200 = 21 950.00 (а не (25 000 + 700) × 0.85)
-        fail("TODO: implement test");
+        PriceCalculator base = new BasePriceCalculator(new VipDiscountStrategy());
+        PriceCalculator calculator = new PackagingDecorator(new DeliveryDecorator(base));
+        assertThat(calculator.calculate(OrderTestData.createVipOrder())).isEqualTo(rub("21950.00"));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Повторное добавление одной услуги запрещено")
     void sameServiceCannotBeAddedTwice() {
-        // TODO: new DeliveryDecorator(new DeliveryDecorator(base)) → IllegalStateException
-        fail("TODO: implement test");
+        PriceCalculator base = new BasePriceCalculator(new RegularDiscountStrategy());
+        PriceCalculator withDelivery = new DeliveryDecorator(base);
+        assertThatThrownBy(() -> new DeliveryDecorator(withDelivery))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

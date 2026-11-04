@@ -17,10 +17,12 @@ public class TotalAmountValidator extends AbstractOrderValidator {
 
     @Override
     public void validate(OrderDraft order) {
-        // TODO:
-        // 1. Получить стоимость товаров заказа (OrderDraft#subtotal).
-        // 2. Если она больше MAX_TOTAL_AMOUNT — OrderValidationException с кодом TOTAL_AMOUNT_EXCEEDED.
-        // 3. Иначе передать заказ следующему звену.
-        throw new UnsupportedOperationException("TODO");
+        if (order.subtotal().compareTo(MAX_TOTAL_AMOUNT) > 0) {
+            throw new OrderValidationException(
+                    ValidationErrorCode.TOTAL_AMOUNT_EXCEEDED,
+                    "Сумма заказа превышает максимально допустимую (1 000 000 ₽)"
+            );
+        }
+        passToNext(order);
     }
 }

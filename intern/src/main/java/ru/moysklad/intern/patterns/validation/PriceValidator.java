@@ -1,6 +1,9 @@
 package ru.moysklad.intern.patterns.validation;
 
 import ru.moysklad.intern.patterns.model.OrderDraft;
+import ru.moysklad.intern.patterns.model.OrderItem;
+
+import java.math.BigDecimal;
 
 /**
  * Правило 3: цена каждой позиции задана и неотрицательна (нулевая цена допустима, например для подарка).
@@ -10,11 +13,13 @@ public class PriceValidator extends AbstractOrderValidator {
 
     @Override
     public void validate(OrderDraft order) {
-        // TODO:
-        // 1. Перебрать позиции заказа.
-        // 2. Если цена не задана или отрицательная — OrderValidationException
-        //    с кодом INVALID_PRICE и наименованием товара в сообщении.
-        // 3. Если все цены корректны — передать заказ следующему звену.
-        throw new UnsupportedOperationException("TODO");
+        for (OrderItem pos : order.items()) {
+            if (pos.unitPrice() == null || pos.unitPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new OrderValidationException(
+                        ValidationErrorCode.INVALID_PRICE,
+                        "Некорректная цена для товара: " + pos.productName());
+            }
+        }
+        passToNext(order);
     }
 }
