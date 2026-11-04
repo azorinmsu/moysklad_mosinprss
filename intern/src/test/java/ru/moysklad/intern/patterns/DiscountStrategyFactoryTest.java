@@ -1,10 +1,17 @@
 package ru.moysklad.intern.patterns;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ru.moysklad.intern.patterns.discount.DiscountStrategy;
+import ru.moysklad.intern.patterns.discount.DiscountStrategyFactory;
+import ru.moysklad.intern.patterns.discount.RegularDiscountStrategy;
+import ru.moysklad.intern.patterns.discount.UnsupportedCustomerTypeException;
+import ru.moysklad.intern.patterns.discount.VipDiscountStrategy;
+import ru.moysklad.intern.patterns.discount.WholesaleDiscountStrategy;
+import ru.moysklad.intern.patterns.model.CustomerType;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Задание 2. Фабрика стратегий (Simple Factory).
@@ -12,42 +19,44 @@ import static org.junit.jupiter.api.Assertions.fail;
 class DiscountStrategyFactoryTest {
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("REGULAR → RegularDiscountStrategy")
     void createsRegularStrategy() {
-        // TODO: create(REGULAR) возвращает экземпляр RegularDiscountStrategy
-        fail("TODO: implement test");
+        DiscountStrategyFactory factory = new DiscountStrategyFactory();
+        DiscountStrategy strategy = factory.create(CustomerType.REGULAR);
+        assertThat(strategy).isInstanceOf(RegularDiscountStrategy.class);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("WHOLESALE → WholesaleDiscountStrategy")
     void createsWholesaleStrategy() {
-        // TODO: create(WHOLESALE) возвращает экземпляр WholesaleDiscountStrategy
-        fail("TODO: implement test");
+        DiscountStrategyFactory factory = new DiscountStrategyFactory();
+        DiscountStrategy strategy = factory.create(CustomerType.WHOLESALE);
+        assertThat(strategy).isInstanceOf(WholesaleDiscountStrategy.class);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("VIP → VipDiscountStrategy")
     void createsVipStrategy() {
-        // TODO: create(VIP) возвращает экземпляр VipDiscountStrategy
-        fail("TODO: implement test");
+        DiscountStrategyFactory factory = new DiscountStrategyFactory();
+        DiscountStrategy strategy = factory.create(CustomerType.VIP);
+        assertThat(strategy).isInstanceOf(VipDiscountStrategy.class);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Неподдерживаемый тип → UnsupportedCustomerTypeException")
     void unsupportedTypeIsRejected() {
-        // TODO: create(CORPORATE) → UnsupportedCustomerTypeException, getCustomerType() == CORPORATE
-        fail("TODO: implement test");
+        DiscountStrategyFactory factory = new DiscountStrategyFactory();
+        assertThatThrownBy(() -> factory.create(CustomerType.CORPORATE))
+                .isInstanceOf(UnsupportedCustomerTypeException.class)
+                .satisfies(e -> assertThat(((UnsupportedCustomerTypeException) e).getCustomerType())
+                        .isEqualTo(CustomerType.CORPORATE));
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Тип не указан → IllegalArgumentException")
     void missingTypeIsRejected() {
-        // TODO: create(null) → IllegalArgumentException
-        fail("TODO: implement test");
+        DiscountStrategyFactory factory = new DiscountStrategyFactory();
+        assertThatThrownBy(() -> factory.create(null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
