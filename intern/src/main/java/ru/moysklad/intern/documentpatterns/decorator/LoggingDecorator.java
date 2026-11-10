@@ -1,5 +1,6 @@
 package ru.moysklad.intern.documentpatterns.decorator;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentProcessingException;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 
 import java.util.Objects;
@@ -19,12 +20,28 @@ public class LoggingDecorator extends DocumentOperationDecorator {
 
     @Override
     public void execute(ErpDocument document) {
-        // TODO:
-        // 1. Запишите в log строку о начале: тип и id документа, текущий статус.
-        // 2. Вызовите delegate.execute(document).
-        // 3. При успехе запишите строку об успехе с итоговым статусом.
-        // 4. При RuntimeException запишите строку об ошибке (код DocumentProcessingException, если есть)
-        //    и пробросьте ТО ЖЕ исключение дальше — логирование не должно «глотать» ошибки.
-        throw new UnsupportedOperationException("TODO");
+        log.accept(String.format(
+                "Начало: %s (ID: %s). Статус: %s",
+                document.getType(),
+                document.getId(),
+                document.getStatus().name()));
+
+        try {
+            delegate.execute(document);
+
+            log.accept(String.format(
+                    "Успешно: %s (ID: %s). Статус: %s",
+                    document.getType(),
+                    document.getId(),
+                    document.getStatus().name()
+            ));
+        } catch (RuntimeException e) {
+            log.accept(String.format(
+                    "Произошла ошибка с документом (ID: %s): %s",
+                    document.getId(),
+                    e instanceof DocumentProcessingException dpe ? dpe.getCode() : e.getMessage()
+            ));
+            throw e;
+        }
     }
 }

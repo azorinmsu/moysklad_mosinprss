@@ -1,8 +1,10 @@
 package ru.moysklad.intern.documentpatterns.processing;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 import ru.moysklad.intern.documentpatterns.model.StockMovement;
 import ru.moysklad.intern.documentpatterns.strategy.StockMovementStrategy;
+import ru.moysklad.intern.documentpatterns.validation.DocumentValidationException;
 
 import java.util.List;
 import java.util.Objects;
@@ -25,12 +27,14 @@ public class ShipmentProcessor extends AbstractDocumentProcessor {
         // У отгрузки нет склада-получателя: товар уходит покупателю.
         // Если document.getTargetWarehouse() != null — DocumentValidationException
         // с кодом UNEXPECTED_TARGET_WAREHOUSE.
-        throw new UnsupportedOperationException("TODO");
+        if (document.getTargetWarehouse() != null)
+            throw new DocumentValidationException(
+                    DocumentErrorCode.UNEXPECTED_TARGET_WAREHOUSE,
+                    "В документе указан склад-получатель, чего не должно быть для отгрузки. ID: " + document.getId());
     }
 
     @Override
     protected List<StockMovement> calculateMovements(ErpDocument document) {
-        // TODO: делегируйте расчёт movementStrategy.
-        throw new UnsupportedOperationException("TODO");
+        return movementStrategy.calculateMovements(document);
     }
 }

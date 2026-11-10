@@ -1,5 +1,6 @@
 package ru.moysklad.intern.documentpatterns.state;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
 import ru.moysklad.intern.documentpatterns.model.DocumentStatus;
 
 /**
@@ -19,17 +20,11 @@ public final class DraftState implements DocumentState {
 
     @Override
     public void post(DocumentContext context) {
-        // TODO:
-        // 1. Черновик можно провести: запланируйте переход в POSTED через context.transitionTo(...).
-        // 2. Не меняйте статус документа напрямую — его применит context.commit() после успешного проведения.
-        throw new UnsupportedOperationException("TODO");
+        context.transitionTo(DocumentStatus.POSTED);
     }
 
     @Override
     public void unpost(DocumentContext context) {
-        // TODO:
-        // 1. Черновик не проведён — отменять нечего.
-        // 2. Бросьте DocumentStateException с кодом NOT_POSTED и понятным сообщением (id документа).
-        throw new UnsupportedOperationException("TODO");
+        throw new DocumentStateException(DocumentErrorCode.NOT_POSTED, "Черновик не может быть не проведенным");
     }
 }

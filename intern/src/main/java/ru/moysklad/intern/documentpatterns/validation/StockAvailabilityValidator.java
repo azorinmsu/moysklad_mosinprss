@@ -1,6 +1,15 @@
 package ru.moysklad.intern.documentpatterns.validation;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
+import ru.moysklad.intern.documentpatterns.model.StockMovement;
+import ru.moysklad.intern.documentpatterns.repository.StockKey;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Правило: для расходных движений хватает остатков.
@@ -13,13 +22,24 @@ public class StockAvailabilityValidator extends AbstractDocumentValidator {
 
     @Override
     protected void check(ErpDocument document, ValidationContext context) {
-        // TODO:
-        // 1. Возьмите context.plannedMovements() и оставьте только расходные (isOutgoing()).
-        // 2. Сгруппируйте их по StockKey.of(movement) и просуммируйте требуемое количество:
-        //    две позиции одного товара с одного склада требуют сумму, а не каждую по отдельности.
-        // 3. Сравните с context.availableQuantity(key). Если не хватает —
-        //    DocumentValidationException с кодом INSUFFICIENT_STOCK (в сообщении: доступно / требуется).
-        // 4. Приходные движения не проверяйте. Остатки не изменяйте.
-        throw new UnsupportedOperationException("TODO");
+        Map<StockKey, BigDecimal> requiredByStock = new HashMap<>();
+        for (StockMovement move : context.plannedMovements()) {
+            if (move.isOutgoing()) {
+                StockKey k = StockKey.of(move);
+                BigDecimal v = move.delta().abs();
+                requiredByStock.merge(k, v, BigDecimal::add);
+            }
+        }
+        for (Map.Entry<StockKey, BigDecimal> entry : requiredByStock.entrySet()) {
+            StockKey key = entry.getKey();
+            BigDecimal required = entry.getValue();
+            BigDecimal available = context.availableQuantity(key);
+            if (available.compareTo(required) < 0) {
+                throw new DocumentValidationException(
+                        DocumentErrorCode.INSUFFICIENT_STOCK,
+                        String.format("Недостаточно товара на складе. Доступно: %s, требуется: %s", available, required)
+                );
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 package ru.moysklad.intern.documentpatterns.state;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
 import ru.moysklad.intern.documentpatterns.model.DocumentStatus;
 
 /**
@@ -19,17 +20,11 @@ public final class PostedState implements DocumentState {
 
     @Override
     public void post(DocumentContext context) {
-        // TODO:
-        // 1. Повторное проведение запрещено — иначе остатки изменятся дважды.
-        // 2. Бросьте DocumentStateException с кодом ALREADY_POSTED.
-        throw new UnsupportedOperationException("TODO");
+        throw new DocumentStateException(DocumentErrorCode.ALREADY_POSTED, "Документ уже проведен, повторное проведение невозможно");
     }
 
     @Override
     public void unpost(DocumentContext context) {
-        // TODO:
-        // 1. Проведённый документ можно отменить: запланируйте переход в CANCELLED.
-        // 2. Обратные движения строит не состояние, а UnpostDocumentCommand.
-        throw new UnsupportedOperationException("TODO");
+        context.transitionTo(DocumentStatus.CANCELLED);
     }
 }
