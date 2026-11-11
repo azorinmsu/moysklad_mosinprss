@@ -25,10 +25,5 @@ public class ShipmentMovementStrategy implements StockMovementStrategy {
                         pos.lot(),
                         pos.quantity().negate()
                 )).toList();
-        // TODO:
-        // 1. Для каждой позиции создайте StockMovement на складе document.getSourceWarehouse()
-        //    с delta = -quantity (BigDecimal#negate).
-        // 2. Сохраните порядок позиций, верните неизменяемый список.
-        // 3. Остатки здесь не проверяйте — это задача StockAvailabilityValidator и хранилища.
     }
 }

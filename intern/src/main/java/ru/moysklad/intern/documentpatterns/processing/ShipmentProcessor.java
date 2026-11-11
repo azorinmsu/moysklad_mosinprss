@@ -23,10 +23,6 @@ public class ShipmentProcessor extends AbstractDocumentProcessor {
 
     @Override
     protected void validateSpecific(ErpDocument document) {
-        // TODO:
-        // У отгрузки нет склада-получателя: товар уходит покупателю.
-        // Если document.getTargetWarehouse() != null — DocumentValidationException
-        // с кодом UNEXPECTED_TARGET_WAREHOUSE.
         if (document.getTargetWarehouse() != null)
             throw new DocumentValidationException(
                     DocumentErrorCode.UNEXPECTED_TARGET_WAREHOUSE,

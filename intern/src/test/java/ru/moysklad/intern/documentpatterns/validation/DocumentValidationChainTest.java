@@ -1,10 +1,31 @@
 package ru.moysklad.intern.documentpatterns.validation;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import ru.moysklad.intern.documentpatterns.model.AcceptanceDocument;
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
+import ru.moysklad.intern.documentpatterns.model.ShipmentDocument;
+import ru.moysklad.intern.documentpatterns.model.TransferDocument;
+import ru.moysklad.intern.documentpatterns.repository.InMemoryStockRepository;
+import ru.moysklad.intern.documentpatterns.strategy.AcceptanceMovementStrategy;
+import ru.moysklad.intern.documentpatterns.strategy.ShipmentMovementStrategy;
+import ru.moysklad.intern.documentpatterns.strategy.TransferMovementStrategy;
+import ru.moysklad.intern.documentpatterns.support.RecordingValidator;
+import ru.moysklad.intern.documentpatterns.support.TestStocks;
+import ru.moysklad.intern.entity.Product;
+import ru.moysklad.intern.entity.warehouse.Warehouse;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static ru.moysklad.intern.documentpatterns.support.TestDocuments.acceptance;
+import static ru.moysklad.intern.documentpatterns.support.TestDocuments.position;
+import static ru.moysklad.intern.documentpatterns.support.TestDocuments.product;
+import static ru.moysklad.intern.documentpatterns.support.TestDocuments.shipment;
+import static ru.moysklad.intern.documentpatterns.support.TestDocuments.transfer;
+import static ru.moysklad.intern.documentpatterns.support.TestDocuments.warehouse;
 
 /**
  * Часть 3. Chain of Responsibility — проверки документа.
@@ -13,80 +34,174 @@ import static org.junit.jupiter.api.Assertions.fail;
 class DocumentValidationChainTest {
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Пустой документ → EMPTY_DOCUMENT")
     void emptyDocumentIsRejected() {
-        // TODO: defaultChain().validate(acceptance(a), context) → код EMPTY_DOCUMENT.
-        fail("TODO: implement test");
+        Warehouse a = warehouse("A");
+        AcceptanceDocument doc = acceptance(a);
+        ValidationContext context = new ValidationContext(TestStocks.empty(), List::of);
+
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(doc, context))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.EMPTY_DOCUMENT);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Нулевое и отрицательное количество → INVALID_QUANTITY")
     void invalidQuantityIsRejected() {
-        // TODO: position(x, "0") и position(x, "-1") → код INVALID_QUANTITY.
-        fail("TODO: implement test");
+        Warehouse a = warehouse("A");
+        Product x = product("X");
+
+        AcceptanceDocument docZero = acceptance(a, position(x, "0"));
+        ValidationContext ctxZero = new ValidationContext(TestStocks.empty(), List::of);
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(docZero, ctxZero))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.INVALID_QUANTITY);
+
+        AcceptanceDocument docNeg = acceptance(a, position(x, "-1"));
+        ValidationContext ctxNeg = new ValidationContext(TestStocks.empty(), List::of);
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(docNeg, ctxNeg))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.INVALID_QUANTITY);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Отсутствующий склад → MISSING_TARGET_WAREHOUSE / MISSING_SOURCE_WAREHOUSE")
     void missingWarehouseIsRejected() {
-        // TODO: acceptance(null, ...) → MISSING_TARGET_WAREHOUSE; shipment(null, ...) → MISSING_SOURCE_WAREHOUSE;
-        //  transfer(a, null, ...) → MISSING_TARGET_WAREHOUSE.
-        fail("TODO: implement test");
+        Product x = product("X");
+        Warehouse a = warehouse("A");
+
+        AcceptanceDocument accNull = acceptance(null, position(x, "10"));
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(accNull, new ValidationContext(TestStocks.empty(), List::of)))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.MISSING_TARGET_WAREHOUSE);
+
+        ShipmentDocument shipNull = shipment(null, position(x, "10"));
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(shipNull, new ValidationContext(TestStocks.empty(), List::of)))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.MISSING_SOURCE_WAREHOUSE);
+
+        TransferDocument trNull = transfer(a, null, position(x, "10"));
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(trNull, new ValidationContext(TestStocks.empty(), List::of)))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.MISSING_TARGET_WAREHOUSE);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Перемещение на тот же склад → SAME_WAREHOUSES")
     void sameWarehousesAreRejected() {
-        // TODO: transfer(a, a, position(x, "1")) → SAME_WAREHOUSES.
-        fail("TODO: implement test");
+        Warehouse a = warehouse("A");
+        Product x = product("X");
+        TransferDocument doc = transfer(a, a, position(x, "1"));
+
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(doc, new ValidationContext(TestStocks.empty(), List::of)))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.SAME_WAREHOUSES);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Недостаточный остаток → INSUFFICIENT_STOCK, учитывается сумма позиций одного товара")
     void insufficientStockIsRejected() {
-        // TODO 1: Остаток X на A = 10. Отгрузка 11 → INSUFFICIENT_STOCK.
-        // TODO 2: Отгрузка 6 + 6 одного товара → INSUFFICIENT_STOCK (каждая позиция по отдельности проходит).
-        // TODO 3: Приёмка без остатка проходит — приход не проверяется.
-        fail("TODO: implement test");
+        Warehouse a = warehouse("A");
+        Product x = product("X");
+        InMemoryStockRepository stocks = TestStocks.withQuantity(x, a, "10");
+
+        ShipmentDocument ship11 = shipment(a, position(x, "11"));
+        ValidationContext ctx11 = new ValidationContext(stocks, () -> new ShipmentMovementStrategy().calculateMovements(ship11));
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(ship11, ctx11))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.INSUFFICIENT_STOCK);
+
+        ShipmentDocument ship6plus6 = shipment(a, position(x, "6"), position(x, "6"));
+        ValidationContext ctx6plus6 = new ValidationContext(stocks, () -> new ShipmentMovementStrategy().calculateMovements(ship6plus6));
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(ship6plus6, ctx6plus6))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.INSUFFICIENT_STOCK);
+
+        AcceptanceDocument acc = acceptance(a, position(x, "100"));
+        ValidationContext ctxAcc = new ValidationContext(TestStocks.empty(), () -> new AcceptanceMovementStrategy().calculateMovements(acc));
+        assertThatCode(() -> DocumentValidationChain.defaultChain().validate(acc, ctxAcc))
+                .doesNotThrowAnyException();
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("После ошибки цепочка прекращается: следующее звено не вызвано, движения не рассчитаны")
     void chainStopsAfterFirstError() {
-        // TODO 1: DocumentValidationChain.of(new PositionValidator(), new RecordingValidator()) на пустом документе.
-        // TODO 2: Код EMPTY_DOCUMENT, RecordingValidator.invocations() == 0.
-        // TODO 3: defaultChain() на пустом документе: context.movementsCalculated() == false.
-        fail("TODO: implement test");
+        Warehouse a = warehouse("A");
+        AcceptanceDocument emptyDoc = acceptance(a);
+        RecordingValidator recording = new RecordingValidator();
+        DocumentValidationChain chain = DocumentValidationChain.of(new PositionValidator(), recording);
+        ValidationContext ctx = new ValidationContext(TestStocks.empty(), () -> { throw new AssertionError("Should not calculate movements"); });
+
+        assertThatThrownBy(() -> chain.validate(emptyDoc, ctx))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.EMPTY_DOCUMENT);
+        assertThat(recording.invocations()).isZero();
+
+        ValidationContext defaultCtx = new ValidationContext(TestStocks.empty(), List::of);
+        assertThatThrownBy(() -> DocumentValidationChain.defaultChain().validate(emptyDoc, defaultCtx))
+                .isInstanceOf(DocumentValidationException.class);
+        assertThat(defaultCtx.movementsCalculated()).isFalse();
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Корректные приёмка, отгрузка и перемещение проходят все проверки")
     void validDocumentsPass() {
-        // TODO: assertThatCode(() -> chain.validate(...)).doesNotThrowAnyException() для трёх типов.
-        fail("TODO: implement test");
+        Warehouse a = warehouse("A");
+        Warehouse b = warehouse("B");
+        Product x = product("X");
+        InMemoryStockRepository stocks = TestStocks.withQuantity(x, a, "100");
+
+        AcceptanceDocument acc = acceptance(a, position(x, "10"));
+        ValidationContext ctxAcc = new ValidationContext(stocks, () -> new AcceptanceMovementStrategy().calculateMovements(acc));
+        assertThatCode(() -> DocumentValidationChain.defaultChain().validate(acc, ctxAcc)).doesNotThrowAnyException();
+
+        ShipmentDocument ship = shipment(a, position(x, "10"));
+        ValidationContext ctxShip = new ValidationContext(stocks, () -> new ShipmentMovementStrategy().calculateMovements(ship));
+        assertThatCode(() -> DocumentValidationChain.defaultChain().validate(ship, ctxShip)).doesNotThrowAnyException();
+
+        TransferDocument tr = transfer(a, b, position(x, "10"));
+        ValidationContext ctxTr = new ValidationContext(stocks, () -> new TransferMovementStrategy().calculateMovements(tr));
+        assertThatCode(() -> DocumentValidationChain.defaultChain().validate(tr, ctxTr)).doesNotThrowAnyException();
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Стандартная цепочка: структурные проверки раньше проверки остатков")
     void defaultChainOrder() {
-        // TODO: defaultChain().links() → классы Position, Quantity, Warehouse, StockAvailability по порядку.
-        fail("TODO: implement test");
+        List<AbstractDocumentValidator> links = DocumentValidationChain.defaultChain().links();
+        assertThat(links).hasSize(4);
+        assertThat(links.get(0)).isInstanceOf(PositionValidator.class);
+        assertThat(links.get(1)).isInstanceOf(QuantityValidator.class);
+        assertThat(links.get(2)).isInstanceOf(WarehouseValidator.class);
+        assertThat(links.get(3)).isInstanceOf(StockAvailabilityValidator.class);
     }
 
     @Test
-    @Disabled("TODO: implement test")
     @DisplayName("Цепочку можно расширить новым звеном без изменения существующих")
     void chainIsExtensible() {
-        // TODO: of(new PositionValidator(), ..., RecordingValidator.failingWith(DUPLICATE_POSITION))
-        //  → на корректном документе код DUPLICATE_POSITION.
-        fail("TODO: implement test");
+        Warehouse a = warehouse("A");
+        Product x = product("X");
+        AcceptanceDocument doc = acceptance(a, position(x, "10"));
+        DocumentValidationChain chain = DocumentValidationChain.of(
+                new PositionValidator(),
+                new QuantityValidator(),
+                new WarehouseValidator(),
+                RecordingValidator.failingWith(DocumentErrorCode.DUPLICATE_POSITION)
+        );
+        ValidationContext ctx = new ValidationContext(TestStocks.empty(), List::of);
+
+        assertThatThrownBy(() -> chain.validate(doc, ctx))
+                .isInstanceOf(DocumentValidationException.class)
+                .extracting(e -> ((DocumentValidationException) e).getCode())
+                .isEqualTo(DocumentErrorCode.DUPLICATE_POSITION);
     }
 }
