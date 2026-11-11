@@ -1,24 +1,29 @@
 package ru.moysklad.intern.documentpatterns.service;
 
 import ru.moysklad.intern.documentpatterns.builder.DocumentBuilder;
-import ru.moysklad.intern.documentpatterns.command.CommandHistoryEntry;
-import ru.moysklad.intern.documentpatterns.command.CommandOutcome;
-import ru.moysklad.intern.documentpatterns.command.DocumentCommandExecutor;
+import ru.moysklad.intern.documentpatterns.command.*;
+import ru.moysklad.intern.documentpatterns.decorator.AuditDecorator;
 import ru.moysklad.intern.documentpatterns.decorator.AuditTrail;
 import ru.moysklad.intern.documentpatterns.decorator.DocumentOperation;
+import ru.moysklad.intern.documentpatterns.decorator.LoggingDecorator;
 import ru.moysklad.intern.documentpatterns.factory.AcceptanceDocumentFactory;
 import ru.moysklad.intern.documentpatterns.factory.DocumentFactory;
 import ru.moysklad.intern.documentpatterns.factory.DocumentFactoryRegistry;
 import ru.moysklad.intern.documentpatterns.factory.ShipmentDocumentFactory;
 import ru.moysklad.intern.documentpatterns.factory.TransferDocumentFactory;
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
+import ru.moysklad.intern.documentpatterns.model.DocumentProcessingException;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
+import ru.moysklad.intern.documentpatterns.observer.DocumentEvent;
 import ru.moysklad.intern.documentpatterns.observer.DocumentEventPublisher;
+import ru.moysklad.intern.documentpatterns.observer.DocumentEventType;
+import ru.moysklad.intern.documentpatterns.processing.AbstractDocumentProcessor;
+import ru.moysklad.intern.documentpatterns.processing.ProcessingInfrastructure;
 import ru.moysklad.intern.documentpatterns.repository.StockRepository;
+import ru.moysklad.intern.documentpatterns.validation.DocumentValidationChain;
 import ru.moysklad.intern.entity.operation.DocumentsType;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -48,14 +53,28 @@ public class DocumentService {
                            DocumentEventPublisher eventPublisher,
                            AuditTrail auditTrail,
                            Consumer<String> log) {
-        // TODO:
-        // 1. Сохраните stockRepository, eventPublisher; создайте DocumentFactoryRegistry(factories)
-        //    и DocumentCommandExecutor.
-        // 2. Создайте ProcessingInfrastructure с DocumentValidationChain.defaultChain().
-        // 3. Для каждой фабрики реестра один раз создайте обработчик (factory.createProcessor(...))
-        //    и оберните его декораторами: new AuditDecorator(new LoggingDecorator(processor, log), auditTrail, "POST").
-        // 4. Сохраните получившиеся операции в postingOperations по типу документа (EnumMap → Map.copyOf).
-        throw new UnsupportedOperationException("TODO");
+        this.stockRepository = Objects.requireNonNull(stockRepository, "stockRepository");
+        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
+        this.factoryRegistry = new DocumentFactoryRegistry(factories);
+        this.commandExecutor = new DocumentCommandExecutor();
+
+        ProcessingInfrastructure infrastructure = new ProcessingInfrastructure(
+                DocumentValidationChain.defaultChain(),
+                stockRepository,
+                eventPublisher
+        );
+
+        Map<DocumentsType, DocumentOperation> operations = new EnumMap<>(DocumentsType.class);
+        for (DocumentFactory factory : factoryRegistry.factories()) {
+            AbstractDocumentProcessor processor = factory.createProcessor(infrastructure);
+            DocumentOperation decorated = new AuditDecorator(
+                    new LoggingDecorator(processor, log),
+                    auditTrail,
+                    "POST"
+            );
+            operations.put(factory.documentType(), decorated);
+        }
+        this.postingOperations = Map.copyOf(operations);
     }
 
     /** Сервис со всеми обязательными типами документов лабораторной. */
@@ -77,11 +96,14 @@ public class DocumentService {
      * }</pre>
      */
     public ErpDocument create(DocumentsType type, Consumer<DocumentBuilder> specification) {
-        // TODO:
-        // 1. Найдите фабрику: factoryRegistry.forType(type).
-        // 2. DocumentBuilder.forFactory(factory); передайте builder в specification; build().
-        // 3. Опубликуйте DocumentEvent.of(DOCUMENT_CREATED, document) и верните документ.
-        throw new UnsupportedOperationException("TODO");
+        DocumentFactory factory = factoryRegistry.forType(type);
+        DocumentBuilder builder = DocumentBuilder.forFactory(factory);
+        specification.accept(builder);
+
+        ErpDocument doc = builder.build();
+
+        eventPublisher.publish(DocumentEvent.of(DocumentEventType.DOCUMENT_CREATED, doc));
+        return doc;
     }
 
     public CommandOutcome post(ErpDocument document) {
@@ -90,12 +112,17 @@ public class DocumentService {
 
     /** Проведение с явным {@code operationId}: повтор с тем же id не изменит остатки повторно. */
     public CommandOutcome post(ErpDocument document, UUID operationId) {
-        // TODO:
-        // 1. Найдите операцию проведения для document.getType() в postingOperations
-        //    (нет — DocumentProcessingException UNSUPPORTED_DOCUMENT_TYPE).
-        // 2. Создайте PostDocumentCommand(operationId, document, operation) и выполните через commandExecutor.
-        // 3. Не вызывайте здесь валидацию, State или публикацию событий — это уже делает обработчик.
-        throw new UnsupportedOperationException("TODO");
+        if (document == null)
+            throw new DocumentProcessingException(DocumentErrorCode.DOCUMENT_REQUIRED, "Документ не передан");
+
+        DocumentOperation operation = postingOperations.get(document.getType());
+        if (operation == null)
+            throw new DocumentProcessingException(
+                    DocumentErrorCode.UNSUPPORTED_DOCUMENT_TYPE,
+                    "Тип документа не поддерживается: " + document.getType()
+            );
+        PostDocumentCommand command = new PostDocumentCommand(operationId, document, operation);
+        return commandExecutor.execute(command);
     }
 
     public CommandOutcome unpost(ErpDocument document) {
@@ -103,8 +130,13 @@ public class DocumentService {
     }
 
     public CommandOutcome unpost(ErpDocument document, UUID operationId) {
-        // TODO: создайте UnpostDocumentCommand и выполните через commandExecutor.
-        throw new UnsupportedOperationException("TODO");
+        if (document == null)
+            throw new DocumentProcessingException(DocumentErrorCode.DOCUMENT_REQUIRED, "Документ не передан");
+
+        UnpostDocumentCommand command = new UnpostDocumentCommand(
+                operationId, document, stockRepository, eventPublisher
+        );
+        return commandExecutor.execute(command);
     }
 
     public List<CommandHistoryEntry> operationHistory() {

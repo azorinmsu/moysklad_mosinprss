@@ -1,6 +1,9 @@
 package ru.moysklad.intern.documentpatterns.observer;
 
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -12,13 +15,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class AuditDocumentListener implements DocumentEventListener {
 
     private final List<DocumentEvent> journal = new CopyOnWriteArrayList<>();
+    private final Set<UUID> seenEventIds = ConcurrentHashMap.newKeySet();
 
     @Override
     public void onEvent(DocumentEvent event) {
-        // TODO:
-        // 1. Добавьте событие в journal.
-        // 2. Повторная доставка того же события (тот же eventId) не должна создавать дубль записи.
-        throw new UnsupportedOperationException("TODO");
+        if (event != null && seenEventIds.add(event.eventId())) {
+            journal.add(event);
+        }
     }
 
     public List<DocumentEvent> journal() {
