@@ -1,9 +1,15 @@
 package ru.moysklad.intern.documentpatterns.command;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentProcessingException;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
+import ru.moysklad.intern.documentpatterns.model.StockMovement;
+import ru.moysklad.intern.documentpatterns.observer.DocumentEvent;
 import ru.moysklad.intern.documentpatterns.observer.DocumentEventPublisher;
+import ru.moysklad.intern.documentpatterns.observer.DocumentEventType;
 import ru.moysklad.intern.documentpatterns.repository.StockRepository;
+import ru.moysklad.intern.documentpatterns.state.DocumentContext;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -45,17 +51,24 @@ public class UnpostDocumentCommand implements DocumentCommand {
 
     @Override
     public void execute() {
-        // TODO:
-        // 1. Проверить возможность отмены: new DocumentContext(document).unpost()
-        //    (State бросит NOT_POSTED / ALREADY_CANCELLED и запланирует переход в CANCELLED).
-        // 2. Построить обратные движения из document.getPostedMovements():
-        //    тот же документ, товар, склад, партия, delta.negate().
-        // 3. Применить их атомарно: stockRepository.apply(...). Хранилище учтёт ТЕКУЩИЕ остатки:
-        //    если со склада-получателя товар уже ушёл, отмена невозможна (INSUFFICIENT_STOCK).
-        // 4. Изменить статус: lifecycle.commit() — только после успешного шага 3.
-        // 5. Опубликовать DocumentEvent.of(DOCUMENT_UNPOSTED, document).
-        // При DocumentProcessingException опубликуйте DocumentEvent.failed(...) и пробросьте исключение;
-        // статус останется POSTED, остатки не изменятся.
-        throw new UnsupportedOperationException("TODO");
+        DocumentContext ctx = new DocumentContext(document);
+        try {
+            ctx.unpost(); // проверяем
+
+            List<StockMovement> reverses = document.getPostedMovements().stream()
+                    .map(m -> new StockMovement(
+                            m.documentId(), m.product(), m.warehouse(), m.lot(), m.delta().negate()))
+                    .toList();
+
+            stockRepository.apply(reverses); // перепроверка остатков
+
+            ctx.commit();
+
+            eventPublisher.publish(DocumentEvent.of(DocumentEventType.DOCUMENT_UNPOSTED, document));
+
+        } catch (DocumentProcessingException e) {
+            eventPublisher.publish(DocumentEvent.failed(document, e.getCode()));
+            throw e;
+        }
     }
 }

@@ -20,12 +20,16 @@ public class NotificationDocumentListener implements DocumentEventListener {
 
     @Override
     public void onEvent(DocumentEvent event) {
-        // TODO:
-        // 1. Уведомляйте о DOCUMENT_POSTED, DOCUMENT_UNPOSTED и DOCUMENT_PROCESSING_FAILED;
-        //    DOCUMENT_CREATED уведомления не требует.
-        // 2. Не отправляйте уведомление повторно для того же eventId (notifiedEventIds.add(...) атомарен).
-        // 3. Текст сообщения должен содержать тип документа, его id и (для ошибки) код ошибки.
-        // 4. Отправьте сообщение через sender.
-        throw new UnsupportedOperationException("TODO");
+        if (event.type().compareTo(DocumentEventType.DOCUMENT_CREATED) == 0)
+            return;
+
+        if (!notifiedEventIds.add(event.eventId()))
+            return;
+
+        String msg = String.format("Документ %s (%s): статус %s", event.documentType(), event.documentId(), event.type());
+        if (event.errorCode() != null) {
+            msg += ", ошибка: " + event.errorCode();
+        }
+        sender.send(msg);
     }
 }

@@ -1,5 +1,7 @@
 package ru.moysklad.intern.documentpatterns.command;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentProcessingException;
+
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -26,20 +28,45 @@ public class DocumentCommandExecutor {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    public CommandOutcome execute(DocumentCommand command) {
-        // TODO:
-        // 1. null-команда — IllegalArgumentException.
-        // 2. Если command.operationId() уже есть в completedOperations — НЕ выполняйте команду,
-        //    запишите в history SKIPPED_DUPLICATE и верните SKIPPED_DUPLICATE.
-        // 3. Иначе выполните command.execute():
-        //    - успех: добавьте operationId в completedOperations, запишите EXECUTED, верните EXECUTED;
-        //    - RuntimeException: запишите FAILED с кодом ошибки (DocumentProcessingException#getCode
-        //      или имя класса) и пробросьте исключение. Неуспешную операцию можно повторить.
-        // 4. Проверка «уже выполнено» и выполнение должны быть атомарны относительно других потоков
-        //    (например, synchronized): иначе два потока выполнят одну операцию дважды.
-        throw new UnsupportedOperationException("TODO");
+    public synchronized CommandOutcome execute(DocumentCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("Команда не может быть null");
+        }
+        if (completedOperations.contains(command.operationId())) {
+            history.addLast(new CommandHistoryEntry(
+                    command.operationId(),
+                    command.name(),
+                    command.document().getId(),
+                    CommandOutcome.SKIPPED_DUPLICATE,
+                    null,
+                    clock.instant()
+            ));
+            return CommandOutcome.SKIPPED_DUPLICATE;
+        }
+        try {
+            command.execute();
+            completedOperations.add(command.operationId());
+            history.addLast(new CommandHistoryEntry(
+                    command.operationId(),
+                    command.name(),
+                    command.document().getId(),
+                    CommandOutcome.EXECUTED,
+                    null,
+                    clock.instant()
+            ));
+            return CommandOutcome.EXECUTED;
+        } catch (RuntimeException e) {
+            history.addLast(new CommandHistoryEntry(
+                    command.operationId(),
+                    command.name(),
+                    command.document().getId(),
+                    CommandOutcome.FAILED,
+                    e instanceof DocumentProcessingException dpe ? dpe.getCode().name() : e.getClass().getSimpleName(),
+                    clock.instant()
+            ));
+            throw e;
+        }
     }
-
     public List<CommandHistoryEntry> history() {
         return List.copyOf(history);
     }

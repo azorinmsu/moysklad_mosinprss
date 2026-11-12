@@ -63,47 +63,56 @@ public final class DocumentBuilder {
     }
 
     public DocumentBuilder id(UUID id) {
-        // TODO: запомните id и верните this.
-        throw new UnsupportedOperationException("TODO");
+        this.id = id;
+        return this;
     }
 
     public DocumentBuilder moment(LocalDateTime moment) {
-        // TODO: запомните дату документа и верните this. Если дату не задали, build() использует текущее время.
-        throw new UnsupportedOperationException("TODO");
+        this.moment = moment;
+        return this;
     }
 
     public DocumentBuilder sourceWarehouse(Warehouse warehouse) {
-        // TODO: запомните склад-источник и верните this.
-        throw new UnsupportedOperationException("TODO");
+        this.sourceWarehouse = warehouse;
+        return this;
     }
 
     public DocumentBuilder targetWarehouse(Warehouse warehouse) {
-        // TODO: запомните склад-получатель и верните this.
-        throw new UnsupportedOperationException("TODO");
+        this.targetWarehouse = warehouse;
+        return this;
     }
 
     public DocumentBuilder addPosition(Product product, BigDecimal quantity) {
-        // TODO: добавьте позицию без партии и верните this.
-        throw new UnsupportedOperationException("TODO");
+        positions.add(new DocumentPosition(product, quantity));
+        return this;
     }
 
     public DocumentBuilder addPosition(Product product, BigDecimal quantity, Lot lot) {
-        // TODO:
-        // 1. Создайте DocumentPosition (null-товар и null-количество отклоняет конструктор записи).
-        // 2. Добавьте в positions и верните this.
-        // Положительность количества здесь не проверяйте — это правило QuantityValidator.
-        throw new UnsupportedOperationException("TODO");
+        positions.add(new DocumentPosition(product, quantity, lot));
+        return this;
     }
 
     public ErpDocument build() {
-        // TODO:
-        // 1. Обязательное поле id: если не задано — IllegalStateException с понятным сообщением.
-        // 2. Дата: moment или LocalDateTime.now().
-        // 3. Создайте документ через factory.createDocument(id, moment).
-        // 4. Обязательные склады определяет документ: requiresSourceWarehouse()/requiresTargetWarehouse().
-        //    Нужный склад не задан — IllegalStateException.
-        // 5. Перенесите в документ заданные склады и все позиции.
-        // 6. Верните документ. Повторный build() должен создавать новый независимый объект.
-        throw new UnsupportedOperationException("TODO");
+        if (id == null)
+            throw new IllegalStateException("ID документа не может быть null");
+        LocalDateTime docMoment = moment == null ? LocalDateTime.now() : moment;
+
+        ErpDocument doc = factory.createDocument(id, docMoment);
+
+        if (doc.requiresSourceWarehouse() && sourceWarehouse == null)
+            throw new IllegalStateException("Для документа типа " + doc.getType() + " требуется склад-источник");
+
+        if (doc.requiresTargetWarehouse() && targetWarehouse == null)
+            throw new IllegalStateException("Для документа типа " + doc.getType() + " требуется склад-получатель");
+
+        if (sourceWarehouse != null)
+            doc.setSourceWarehouse(sourceWarehouse);
+        if (targetWarehouse != null)
+            doc.setTargetWarehouse(targetWarehouse);
+
+        for (DocumentPosition pos : positions)
+            doc.addPosition(pos.product(), pos.quantity(), pos.lot());
+
+        return doc;
     }
 }
