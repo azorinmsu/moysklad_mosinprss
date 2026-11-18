@@ -10,6 +10,8 @@
 
 **Лабораторная «Архитектура обработки ERP-документов с использованием паттернов проектирования» (Factory Method, Abstract Factory, Strategy, Chain of Responsibility, Template Method, Decorator, Command, State, Observer, Builder):** [lab/document-patterns/README.md](lab/document-patterns/README.md). Код — пакет `ru.moysklad.intern.documentpatterns`, unit-тесты без Docker.
 
+**Лабораторная «Многопоточность Java»:** отдельное приложение [labs/java-concurrency-erp](labs/java-concurrency-erp/README.md). Java 21, Spring Boot 3.5, in-memory ERP, без Docker. Модуль `intern` не меняется.
+
 Ниже — отдельное задание по `AggregateStock` / Sales.
 
 ---
