@@ -1,6 +1,6 @@
 package ru.moysklad.intern.collections.queue;
 
-public interface AbstractDeque<T> {
+public interface AbstractCustomDeque<T> {
 
     void addFirst(T val);
 

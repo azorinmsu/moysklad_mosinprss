@@ -1,6 +1,6 @@
 package ru.moysklad.intern.collections.queue;
 
-public interface AbstractQueue<T> {
+public interface AbstractCustomQueue<T> {
 
     boolean offer(T val);
 
