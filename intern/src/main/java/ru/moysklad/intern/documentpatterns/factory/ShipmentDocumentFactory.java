@@ -1,8 +1,11 @@
 package ru.moysklad.intern.documentpatterns.factory;
 
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
+import ru.moysklad.intern.documentpatterns.model.ShipmentDocument;
 import ru.moysklad.intern.documentpatterns.processing.AbstractDocumentProcessor;
 import ru.moysklad.intern.documentpatterns.processing.ProcessingInfrastructure;
+import ru.moysklad.intern.documentpatterns.processing.ShipmentProcessor;
+import ru.moysklad.intern.documentpatterns.strategy.ShipmentMovementStrategy;
 import ru.moysklad.intern.documentpatterns.strategy.StockMovementStrategy;
 import ru.moysklad.intern.entity.operation.DocumentsType;
 
@@ -18,19 +21,16 @@ public class ShipmentDocumentFactory extends DocumentFactory {
 
     @Override
     protected ErpDocument newDocument(UUID id, LocalDateTime moment) {
-        // TODO: создайте ShipmentDocument.
-        throw new UnsupportedOperationException("TODO");
+        return new ShipmentDocument(id, moment);
     }
 
     @Override
     public StockMovementStrategy createMovementStrategy() {
-        // TODO: верните стратегию движений отгрузки.
-        throw new UnsupportedOperationException("TODO");
+        return new ShipmentMovementStrategy();
     }
 
     @Override
     public AbstractDocumentProcessor createProcessor(ProcessingInfrastructure infrastructure) {
-        // TODO: создайте ShipmentProcessor со стратегией из createMovementStrategy().
-        throw new UnsupportedOperationException("TODO");
+        return new ShipmentProcessor(infrastructure, createMovementStrategy());
     }
 }

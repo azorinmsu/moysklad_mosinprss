@@ -16,11 +16,14 @@ public class ShipmentMovementStrategy implements StockMovementStrategy {
 
     @Override
     public List<StockMovement> calculateMovements(ErpDocument document) {
-        // TODO:
-        // 1. Для каждой позиции создайте StockMovement на складе document.getSourceWarehouse()
-        //    с delta = -quantity (BigDecimal#negate).
-        // 2. Сохраните порядок позиций, верните неизменяемый список.
-        // 3. Остатки здесь не проверяйте — это задача StockAvailabilityValidator и хранилища.
-        throw new UnsupportedOperationException("TODO");
+        return document.getPositions()
+                .stream()
+                .map(pos -> new StockMovement(
+                        document.getId(),
+                        pos.product(),
+                        document.getSourceWarehouse(),
+                        pos.lot(),
+                        pos.quantity().negate()
+                )).toList();
     }
 }

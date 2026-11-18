@@ -133,4 +133,5 @@ public abstract class ErpDocument {
     public String toString() {
         return getType() + "[" + id + ", " + status + ", позиций: " + positions.size() + "]";
     }
+
 }

@@ -46,14 +46,12 @@ public final class DocumentValidationChain implements DocumentValidator {
      * Стандартная цепочка проверок перед проведением.
      */
     public static DocumentValidationChain defaultChain() {
-        // TODO:
-        // 1. Соберите цепочку через of(...) из звеньев:
-        //    PositionValidator, QuantityValidator, WarehouseValidator, StockAvailabilityValidator.
-        // 2. Продумайте порядок: дешёвые структурные проверки — раньше,
-        //    проверка остатков (требует расчёта движений) — последней.
-        // 3. Статус документа здесь не проверяется: это делает State на первом шаге
-        //    AbstractDocumentProcessor.process(...) — правило не должно дублироваться.
-        throw new UnsupportedOperationException("TODO");
+        return of(
+                new PositionValidator(),
+                new QuantityValidator(),
+                new WarehouseValidator(),
+                new StockAvailabilityValidator()
+        );
     }
 
     @Override

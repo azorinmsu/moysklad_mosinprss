@@ -1,11 +1,17 @@
 package ru.moysklad.intern.documentpatterns.processing;
 
 import ru.moysklad.intern.documentpatterns.decorator.DocumentOperation;
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
+import ru.moysklad.intern.documentpatterns.model.DocumentProcessingException;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 import ru.moysklad.intern.documentpatterns.model.StockMovement;
+import ru.moysklad.intern.documentpatterns.observer.DocumentEvent;
 import ru.moysklad.intern.documentpatterns.observer.DocumentEventPublisher;
+import ru.moysklad.intern.documentpatterns.observer.DocumentEventType;
 import ru.moysklad.intern.documentpatterns.repository.StockRepository;
+import ru.moysklad.intern.documentpatterns.state.DocumentContext;
 import ru.moysklad.intern.documentpatterns.validation.DocumentValidator;
+import ru.moysklad.intern.documentpatterns.validation.ValidationContext;
 
 import java.util.List;
 import java.util.Objects;
@@ -35,26 +41,35 @@ public abstract class AbstractDocumentProcessor implements DocumentOperation {
      * Проводит документ. Порядок шагов определён здесь и только здесь.
      */
     public final void process(ErpDocument document) {
-        // TODO:
-        // 0. document == null — DocumentProcessingException с кодом DOCUMENT_REQUIRED.
-        // 1. Проверить состояние: new DocumentContext(document).post().
-        //    State проверит, что документ можно провести, и ЗАПЛАНИРУЕТ переход в POSTED.
-        // 2. Бизнес-валидация:
-        //    a) создайте ValidationContext(stockRepository, () -> calculateMovements(document));
-        //    b) validationChain.validate(document, context) — общая цепочка;
-        //    c) validateSpecific(document) — правила конкретного типа.
-        // 3. Рассчитать движения: context.plannedMovements() — тот же список, что видела цепочка
-        //    (стратегия вызывается один раз).
-        // 4. Применить движения атомарно: stockRepository.apply(movements).
-        //    Хранилище повторно проверит остатки: между валидацией и записью они могли измениться.
-        // 5. Изменить статус: lifecycle.commit() — только после успешного шага 4.
-        // 6. Зафиксировать результат: document.recordPostedMovements(movements) — нужно для отмены проведения.
-        // 7. После фиксации опубликовать DocumentEvent.of(DOCUMENT_POSTED, document).
-        //
-        // Ошибки: при DocumentProcessingException на шагах 1–6 опубликуйте
-        // DocumentEvent.failed(document, e.getCode()) и пробросьте исключение.
-        // Статус и остатки при ошибке не должны измениться.
-        throw new UnsupportedOperationException("TODO");
+        if (document == null)
+            throw new DocumentProcessingException(DocumentErrorCode.DOCUMENT_REQUIRED, "Документ не передан");
+
+        DocumentContext ctx = new DocumentContext(document);
+
+        try {
+            ctx.post(); // проверка жизненного цикла
+
+            // валидация
+            ValidationContext valCtx = new ValidationContext(stockRepository, () -> calculateMovements(document));
+            validationChain.validate(document, valCtx);
+            validateSpecific(document);
+
+            // плановые движения
+            List<StockMovement> moves = valCtx.plannedMovements();
+
+            stockRepository.apply(moves);
+
+            ctx.commit();
+
+            document.recordPostedMovements(moves);
+
+            eventPublisher.publish(DocumentEvent.of(DocumentEventType.DOCUMENT_POSTED, document));
+
+
+        } catch (DocumentProcessingException e) {
+            eventPublisher.publish(DocumentEvent.failed(document, e.getCode()));
+            throw e;
+        }
     }
 
     @Override

@@ -1,5 +1,6 @@
 package ru.moysklad.intern.documentpatterns.factory;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentStatus;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 import ru.moysklad.intern.documentpatterns.processing.AbstractDocumentProcessor;
 import ru.moysklad.intern.documentpatterns.processing.ProcessingInfrastructure;
@@ -27,13 +28,23 @@ public abstract class DocumentFactory {
 
     /** Общий алгоритм создания документа (Factory Method использует {@link #newDocument}). */
     public final ErpDocument createDocument(UUID id, LocalDateTime moment) {
-        // TODO:
-        // 1. Проверьте обязательные аргументы: id и moment не null, иначе IllegalArgumentException.
-        // 2. Создайте документ нужного типа через фабричный метод newDocument(id, moment).
-        // 3. Убедитесь, что подкласс вернул документ (не null) типа documentType()
-        //    и в начальном статусе DRAFT; иначе IllegalStateException — это ошибка реализации фабрики.
-        // 4. Верните документ.
-        throw new UnsupportedOperationException("TODO");
+        if (id == null)
+            throw new IllegalArgumentException("ID не может быть нулевым");
+        if (moment == null)
+            throw new IllegalArgumentException("Дата не может быть нулевой");
+
+        ErpDocument doc = newDocument(id, moment);
+
+        // проверки на null
+        if (doc == null)
+            // я вот не знаю, как еще сообщения об ошибке писать?
+            throw new IllegalStateException("Ошибка создания документа - нулевой документ");
+        if (doc.getType() != documentType() || doc.getType() == null)
+            throw new IllegalStateException("Ошибка создания документа - отсутствует валидный тип документа");
+        if (doc.getStatus() != DocumentStatus.DRAFT)
+            throw new IllegalStateException("Ошибка создания документа - документ не является черновиком");
+
+        return doc;
     }
 
     /** Тип документов, которые создаёт фабрика. */

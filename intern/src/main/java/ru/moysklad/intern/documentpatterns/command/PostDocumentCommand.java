@@ -41,9 +41,6 @@ public class PostDocumentCommand implements DocumentCommand {
 
     @Override
     public void execute() {
-        // TODO: проведите документ через postingOperation.
-        // Проверки состояния, валидация, движения и события — внутри обработчика (Template Method);
-        // не дублируйте их в команде.
-        throw new UnsupportedOperationException("TODO");
+        postingOperation.execute(document);
     }
 }

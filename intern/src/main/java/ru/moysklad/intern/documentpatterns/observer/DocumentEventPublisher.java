@@ -16,26 +16,29 @@ public class DocumentEventPublisher {
     private final List<DeliveryFailure> deliveryFailures = new CopyOnWriteArrayList<>();
 
     public void subscribe(DocumentEventListener listener) {
-        // TODO:
-        // 1. null-подписчик — IllegalArgumentException.
-        // 2. Повторная подписка того же экземпляра не должна приводить к двойной доставке.
-        // 3. Добавьте подписчика в listeners (коллекция потокобезопасна).
-        throw new UnsupportedOperationException("TODO");
+        if (listener == null)
+            throw new IllegalArgumentException("Отсутствует подписчик - null");
+
+        if (!listeners.contains(listener))
+            listeners.add(listener);
     }
 
     public void unsubscribe(DocumentEventListener listener) {
-        // TODO: удалите подписчика; отписка неизвестного подписчика — не ошибка.
-        throw new UnsupportedOperationException("TODO");
+        if (listener != null && listeners.contains(listener))
+            listeners.remove(listener);
     }
 
     public void publish(DocumentEvent event) {
-        // TODO:
-        // 1. null-событие — IllegalArgumentException.
-        // 2. Доставьте событие каждому подписчику в порядке подписки.
-        // 3. Исключение одного подписчика перехватите, сохраните в deliveryFailures (DeliveryFailure)
-        //    и продолжите доставку остальным.
-        // 4. Метод не должен пробрасывать исключения подписчиков: операция уже зафиксирована.
-        throw new UnsupportedOperationException("TODO");
+        if (event == null)
+            throw new IllegalArgumentException("Событие не может быть null");
+
+        for (DocumentEventListener listener : listeners) {
+            try {
+                listener.onEvent(event);
+            } catch (RuntimeException e) {
+                deliveryFailures.add(new DeliveryFailure(listener, event, e));
+            }
+        }
     }
 
     public List<DocumentEventListener> listeners() {

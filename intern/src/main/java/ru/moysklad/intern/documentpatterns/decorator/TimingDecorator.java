@@ -26,10 +26,12 @@ public class TimingDecorator extends DocumentOperationDecorator {
 
     @Override
     public void execute(ErpDocument document) {
-        // TODO (дополнительно):
-        // 1. Засеките время до delegate.execute(document).
-        // 2. В finally вычислите длительность и передайте её в sink — и при успехе, и при ошибке.
-        // 3. Исключение делегата пробросьте без изменений.
-        throw new UnsupportedOperationException("TODO");
+        long start = nanoTime.getAsLong();
+        try {
+            delegate.execute(document);
+        } finally {
+            long result = nanoTime.getAsLong() - start;
+            sink.accept(document, Duration.ofNanos(result));
+        }
     }
 }

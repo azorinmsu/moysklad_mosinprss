@@ -1,11 +1,17 @@
 package ru.moysklad.intern.documentpatterns.processing;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
+import ru.moysklad.intern.documentpatterns.model.DocumentPosition;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 import ru.moysklad.intern.documentpatterns.model.StockMovement;
+import ru.moysklad.intern.documentpatterns.repository.StockKey;
 import ru.moysklad.intern.documentpatterns.strategy.StockMovementStrategy;
+import ru.moysklad.intern.documentpatterns.validation.DocumentValidationException;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Проведение перемещения.
@@ -21,17 +27,19 @@ public class TransferProcessor extends AbstractDocumentProcessor {
 
     @Override
     protected void validateSpecific(ErpDocument document) {
-        // TODO:
-        // В перемещении одна и та же пара «товар + партия» не должна встречаться дважды:
-        // такие позиции нужно объединять, иначе пользователь не видит итогового количества к перемещению.
-        // Сравнивайте товары и партии по id. Нарушение — DocumentValidationException с кодом DUPLICATE_POSITION.
-        // (Наличие и различие складов уже проверил WarehouseValidator — не дублируйте.)
-        throw new UnsupportedOperationException("TODO");
+        Set<StockKey> seen = new HashSet<>();
+        for (DocumentPosition pos : document.getPositions()) {
+            StockKey k = StockKey.of(pos.product(), document.getSourceWarehouse(), pos.lot());
+            if (!seen.add(k)) {
+                throw new DocumentValidationException(
+                        DocumentErrorCode.DUPLICATE_POSITION,
+                        "Дублирующаяся позиция товара в перемещении: " + pos.product().getName());
+            }
+        }
     }
 
     @Override
     protected List<StockMovement> calculateMovements(ErpDocument document) {
-        // TODO: делегируйте расчёт movementStrategy.
-        throw new UnsupportedOperationException("TODO");
+        return movementStrategy.calculateMovements(document);
     }
 }

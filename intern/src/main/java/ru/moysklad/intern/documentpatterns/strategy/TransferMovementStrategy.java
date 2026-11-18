@@ -1,8 +1,10 @@
 package ru.moysklad.intern.documentpatterns.strategy;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentPosition;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 import ru.moysklad.intern.documentpatterns.model.StockMovement;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -16,12 +18,26 @@ public class TransferMovementStrategy implements StockMovementStrategy {
 
     @Override
     public List<StockMovement> calculateMovements(ErpDocument document) {
-        // TODO:
-        // 1. Для каждой позиции создайте ДВА движения:
-        //    a) document.getSourceWarehouse(): delta = -quantity;
-        //    b) document.getTargetWarehouse(): delta = +quantity.
-        // 2. Порядок: расход, затем приход — для каждой позиции по очереди.
-        // 3. Атомарность обеспечит хранилище при применении всего набора; стратегия лишь считает.
-        throw new UnsupportedOperationException("TODO");
+        // сразу выделим необходимое кол-во памяти под лист
+        List<StockMovement> moves = new ArrayList<>(document.getPositions().size() * 2);
+
+        for (DocumentPosition pos : document.getPositions()) {
+            moves.add(new StockMovement(
+                    document.getId(),
+                    pos.product(),
+                    document.getSourceWarehouse(),
+                    pos.lot(),
+                    pos.quantity().negate()
+            ));
+
+            moves.add(new StockMovement(
+                    document.getId(),
+                    pos.product(),
+                    document.getTargetWarehouse(),
+                    pos.lot(),
+                    pos.quantity()
+            ));
+        }
+        return List.copyOf(moves); // гарантируем НЕИЗМЕНЯЕМОСТЬ
     }
 }

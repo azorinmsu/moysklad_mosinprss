@@ -1,8 +1,11 @@
 package ru.moysklad.intern.documentpatterns.factory;
 
+import ru.moysklad.intern.documentpatterns.model.AcceptanceDocument;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 import ru.moysklad.intern.documentpatterns.processing.AbstractDocumentProcessor;
+import ru.moysklad.intern.documentpatterns.processing.AcceptanceProcessor;
 import ru.moysklad.intern.documentpatterns.processing.ProcessingInfrastructure;
+import ru.moysklad.intern.documentpatterns.strategy.AcceptanceMovementStrategy;
 import ru.moysklad.intern.documentpatterns.strategy.StockMovementStrategy;
 import ru.moysklad.intern.entity.operation.DocumentsType;
 
@@ -18,19 +21,16 @@ public class AcceptanceDocumentFactory extends DocumentFactory {
 
     @Override
     protected ErpDocument newDocument(UUID id, LocalDateTime moment) {
-        // TODO: создайте AcceptanceDocument.
-        throw new UnsupportedOperationException("TODO");
+        return new AcceptanceDocument(id, moment);
     }
 
     @Override
     public StockMovementStrategy createMovementStrategy() {
-        // TODO: верните стратегию движений приёмки.
-        throw new UnsupportedOperationException("TODO");
+        return new AcceptanceMovementStrategy();
     }
 
     @Override
     public AbstractDocumentProcessor createProcessor(ProcessingInfrastructure infrastructure) {
-        // TODO: создайте AcceptanceProcessor со стратегией из createMovementStrategy().
-        throw new UnsupportedOperationException("TODO");
+        return new AcceptanceProcessor(infrastructure, createMovementStrategy());
     }
 }

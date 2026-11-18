@@ -1,5 +1,6 @@
 package ru.moysklad.intern.documentpatterns.validation;
 
+import ru.moysklad.intern.documentpatterns.model.DocumentErrorCode;
 import ru.moysklad.intern.documentpatterns.model.ErpDocument;
 
 /**
@@ -9,9 +10,10 @@ public class PositionValidator extends AbstractDocumentValidator {
 
     @Override
     protected void check(ErpDocument document, ValidationContext context) {
-        // TODO:
-        // 1. Если document.getPositions() пуст — DocumentValidationException с кодом EMPTY_DOCUMENT.
-        // 2. В сообщение добавьте id документа.
-        throw new UnsupportedOperationException("TODO");
+        if (document.getPositions() == null || document.getPositions().isEmpty())
+            throw new DocumentValidationException(
+                    DocumentErrorCode.EMPTY_DOCUMENT,
+                    "Отсутствуют товарные позиции документа с ID: " + document.getId()
+            );
     }
 }
