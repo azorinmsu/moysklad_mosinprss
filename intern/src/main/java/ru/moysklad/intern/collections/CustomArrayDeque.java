@@ -104,6 +104,11 @@ public class CustomArrayDeque<T> implements AbstractCustomDeque<T> {
 
         int oldCap = elements.length;
         int newCap = oldCap * 2;
+
+        // при превышении, значения становятся отрицательными
+        if (newCap <= 0)
+            throw new IndexOutOfBoundsException("Отрицательный индекс: " + newCap);
+
         Object[] newElements = new Object[newCap];
 
         for (int i = 0; i < size; i++) {
