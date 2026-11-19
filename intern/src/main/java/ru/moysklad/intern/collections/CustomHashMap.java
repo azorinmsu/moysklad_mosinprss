@@ -145,8 +145,8 @@ public class CustomHashMap<K, V> implements AbstractCustomMap<K, V> {
         int newCap = table.length * 2;
         Entry<K, V>[] newTable = (Entry<K, V>[]) new Entry[newCap];
 
-        for (int i = 0; i < table.length; i++) {
-            Entry<K, V> curr = table[i];
+        for (Entry<K, V> kvEntry : table) {
+            Entry<K, V> curr = kvEntry;
             while (curr != null) {
                 Entry<K, V> next = curr.next;
                 int newIdx = getIndex(curr.hash, newCap);

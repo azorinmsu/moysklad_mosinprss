@@ -98,6 +98,10 @@ public class CustomArrayDeque<T> implements AbstractCustomDeque<T> {
 
     // Расширение кольцевого массива с сохранением логического порядка
     private void expand() {
+        if (elements.length == Integer.MAX_VALUE - 8)
+            // из-за совместимости с другими реализациями JVM ограничение с -8, а не -2
+            throw new OutOfMemoryError("Превышен максимальный размер массива: 2^31-1");
+
         int oldCap = elements.length;
         int newCap = oldCap * 2;
         Object[] newElements = new Object[newCap];

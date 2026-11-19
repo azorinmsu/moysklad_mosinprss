@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import collections.exceptions.BelowZeroCapacityOfElementsException;
+import ru.moysklad.intern.collections.exceptions.BelowZeroCapacityOfElementsException;
 import ru.moysklad.intern.collections.list.AbstractCustomArrayList;
 
 public class CustomArrayList<T> implements AbstractCustomArrayList<T> {
@@ -47,6 +47,7 @@ public class CustomArrayList<T> implements AbstractCustomArrayList<T> {
     }
 
     // O(n) со сдвигом вправо
+    // поменял реализацию с arraycopy
     @Override
     public void add(int idx, T val) {
         checkIdxForAdd(idx);
@@ -56,23 +57,8 @@ public class CustomArrayList<T> implements AbstractCustomArrayList<T> {
         }
 
         // идем с конца списка и сдвигаем элементы вправо
-        for (int i = size; i > idx; i--) {
-            elements[i] = elements[i - 1];
-        }
-
-        elements[idx] = val;
-        size++;
-    }
-
-    // Вставка через System.arraycopy
-    public void addByNATIVE(int idx, T val) {
-        checkIdxForAdd(idx);
-
-        if (size == capacity) {
-            expand();
-        }
-
         System.arraycopy(elements, idx, elements, idx + 1, size - idx);
+
         elements[idx] = val;
         size++;
     }
@@ -152,7 +138,8 @@ public class CustomArrayList<T> implements AbstractCustomArrayList<T> {
     // Увеличение ёмкости минимум в 1.5 раза
     private void expand() {
         int oldCap = capacity;
-        if (oldCap == Integer.MAX_VALUE) {
+        if (oldCap == Integer.MAX_VALUE - 8) {
+            // также исправил на -8
             throw new OutOfMemoryError("Превышен максимальный размер массива: 2^31-1");
         }
 

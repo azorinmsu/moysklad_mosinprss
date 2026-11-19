@@ -151,26 +151,34 @@ public class CustomPriorityQueue<T> implements AbstractCustomQueue<T> {
         return sb.append("]").toString();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         CustomPriorityQueue<?> that = (CustomPriorityQueue<?>) o;
         if (this.size != that.size) return false;
-        for (int i = 0; i < size; i++) {
-            if (!Objects.equals(this.queue[i], that.queue[i])) {
-                return false;
-            }
-        }
-        return true;
+
+
+        // скопируем сами массивы, чтобы не нарушить исходники
+        Object[] a1 = Arrays.copyOf(this.queue, this.size);
+        Object[] a2 = Arrays.copyOf(that.queue, that.size);
+
+        // отсортируем компаратором
+        Arrays.sort(a1, (x, y) -> this.compare((T) x, (T) y));
+        Arrays.sort(a2, (x, y) -> this.compare((T) x, (T) y));
+
+        return Arrays.equals(a1, a2);
     }
 
     @Override
     public int hashCode() {
-        int result = 1;
-        for (int i = 0; i < size; i++) {
-            result = 31 * result + (queue[i] == null ? 0 : queue[i].hashCode());
-        }
+        // тк порядок не детерминирован в куче, то посчитаем порядконезависимый хэш
+        // (сумма всех хэшей элементов)
+        int result = 0;
+        for (int i = 0; i < size; i++)
+            result += Objects.hashCode(queue[i]);
+
         return result;
     }
 }
