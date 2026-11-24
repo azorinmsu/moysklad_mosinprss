@@ -19,25 +19,43 @@ package ru.moysklad.concurrency.synchronizers;
  */
 public class CustomCountDownLatch {
 
+    private long count;
+
     public CustomCountDownLatch(int count) {
         if (count < 0) {
             throw new IllegalArgumentException("count < 0");
         }
+        this.count = count;
     }
 
-    public void await() throws InterruptedException {
-        throw new UnsupportedOperationException("SYNC-01");
+    public synchronized void await() throws InterruptedException {
+        while (count > 0) {
+            wait();
+        }
+
     }
 
-    public boolean await(long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException {
-        throw new UnsupportedOperationException("SYNC-01");
+    public synchronized boolean await(long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException {
+        long remaining = unit.toNanos(timeout);
+        while (count > 0) {
+            if (remaining <= 0)
+                return false;
+            long started = System.nanoTime();
+            wait(remaining / 1_000_000L, (int) (remaining % 1_000_000L));
+            remaining -= System.nanoTime() - started;
+        }
+        return true;
     }
 
-    public void countDown() {
-        throw new UnsupportedOperationException("SYNC-01");
+    public synchronized void countDown() {
+        if (count > 0) {
+            count--;
+            if (count == 0)
+                notifyAll();
+        }
     }
 
-    public long getCount() {
-        throw new UnsupportedOperationException("SYNC-01");
+    public synchronized long getCount() {
+        return this.count;
     }
 }
