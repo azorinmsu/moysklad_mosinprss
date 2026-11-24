@@ -7,6 +7,9 @@ import ru.moysklad.intern.collections.queue.AbstractCustomDeque;
 public class CustomArrayDeque<T> implements AbstractCustomDeque<T> {
 
     private static final int DEFAULT_CAPACITY = 16;
+    private static final int LOAD_FACTOR = 2;
+    private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
+
     private Object[] elements;
     private int head = 0;
     private int size = 0;
@@ -16,9 +19,14 @@ public class CustomArrayDeque<T> implements AbstractCustomDeque<T> {
     }
 
     public CustomArrayDeque(int initialCapacity) {
-        if (initialCapacity < 1) {
+        if (initialCapacity < 1 || initialCapacity > MAX_ARRAY_SIZE)
+            throw new IllegalArgumentException("Начальная ёмкость должна быть от 1 до " + MAX_ARRAY_SIZE);
+        this.elements = new Object[initialCapacity];
+    }
+
+    public CustomArrayDeque(int initialCapacity, double loadFactor) {
+        if (initialCapacity < 1 || initialCapacity > MAX_ARRAY_SIZE)
             throw new IllegalArgumentException("Начальная ёмкость должна быть >= 1");
-        }
         this.elements = new Object[initialCapacity];
     }
 
@@ -28,9 +36,8 @@ public class CustomArrayDeque<T> implements AbstractCustomDeque<T> {
         if (val == null) {
             throw new NullPointerException("Null-элементы запрещены в Deque");
         }
-        if (size == elements.length) {
+        if (size == elements.length)
             expand();
-        }
         head = (head - 1 + elements.length) % elements.length;
         elements[head] = val;
         size++;
@@ -98,22 +105,16 @@ public class CustomArrayDeque<T> implements AbstractCustomDeque<T> {
 
     // Расширение кольцевого массива с сохранением логического порядка
     private void expand() {
-        if (elements.length >= Integer.MAX_VALUE - 8)
-            // из-за совместимости с другими реализациями JVM ограничение с -8, а не -2
-            throw new OutOfMemoryError("Превышен максимальный размер массива: 2^31-1");
+        if (elements.length >= MAX_ARRAY_SIZE)
+            throw new IllegalStateException("Превышен максимальный размер массива: 2^31-1");
 
         int oldCap = elements.length;
-        int newCap = oldCap * 2;
-
-        // при превышении, значения становятся отрицательными
-        if (newCap <= 0)
-            throw new IndexOutOfBoundsException("Отрицательный индекс: " + newCap);
+        int newCap = (int) Math.min((long) oldCap * LOAD_FACTOR, MAX_ARRAY_SIZE);
 
         Object[] newElements = new Object[newCap];
 
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size; i++)
             newElements[i] = elements[(head + i) % oldCap];
-        }
 
         this.elements = newElements;
         this.head = 0;
@@ -131,9 +132,8 @@ public class CustomArrayDeque<T> implements AbstractCustomDeque<T> {
 
     @Override
     public void clear() {
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size; i++)
             elements[(head + i) % elements.length] = null;
-        }
         head = 0;
         size = 0;
     }
