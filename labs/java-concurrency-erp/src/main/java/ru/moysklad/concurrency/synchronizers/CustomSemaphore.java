@@ -18,29 +18,49 @@ package ru.moysklad.concurrency.synchronizers;
  */
 public class CustomSemaphore {
 
+    public int permits;
+
     public CustomSemaphore(int permits) {
         if (permits < 0) {
             throw new IllegalArgumentException("permits < 0");
         }
+        this.permits = permits;
     }
 
-    public void acquire() throws InterruptedException {
-        throw new UnsupportedOperationException("SYNC-02");
+    public synchronized void acquire() throws InterruptedException {
+        while (permits == 0) {
+            wait();
+        }
+        permits--;
     }
 
-    public boolean tryAcquire() {
-        throw new UnsupportedOperationException("SYNC-02");
+    public synchronized boolean tryAcquire() {
+        if (permits == 0)
+            return false;
+        permits--;
+        return true;
     }
 
-    public boolean tryAcquire(long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException {
-        throw new UnsupportedOperationException("SYNC-02");
+    public synchronized boolean tryAcquire(long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException {
+        long remaining = unit.toNanos(timeout);
+        while (permits == 0) {
+            if (remaining <= 0) {
+                return false;
+            }
+            long started = System.nanoTime();
+            wait(remaining / 1_000_000L, (int) (remaining % 1_000_000L));
+            remaining -= System.nanoTime() - started;
+        }
+        permits--;
+        return true;
     }
 
-    public void release() {
-        throw new UnsupportedOperationException("SYNC-02");
+    public synchronized void release() {
+        permits++;
+        notifyAll();
     }
 
-    public int availablePermits() {
-        throw new UnsupportedOperationException("SYNC-02");
+    public synchronized int availablePermits() {
+        return this.permits;
     }
 }

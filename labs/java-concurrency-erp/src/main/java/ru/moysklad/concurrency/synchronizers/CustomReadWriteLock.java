@@ -1,5 +1,8 @@
 package ru.moysklad.concurrency.synchronizers;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Блокировка чтения и записи для каталога товаров: много читателей цен,
  * один поток обновления.
@@ -22,19 +25,53 @@ package ru.moysklad.concurrency.synchronizers;
  */
 public class CustomReadWriteLock {
 
-    public void lockRead() throws InterruptedException {
-        throw new UnsupportedOperationException("SYNC-03");
+    private int readers;
+    private final Map<Thread, Integer> readHolders = new HashMap<>();
+    private Thread writer;
+    private int waitingWriters;
+
+    public synchronized void lockRead() throws InterruptedException {
+        while (writer != null || waitingWriters > 0)
+            wait();
+        readers++;
+        readHolders.merge(Thread.currentThread(), 1, Integer::sum);
     }
 
-    public void unlockRead() {
-        throw new UnsupportedOperationException("SYNC-03");
+    public synchronized void unlockRead() {
+        Thread self = Thread.currentThread();
+        Integer held = readHolders.get(self);
+        if (held == null)
+            throw new IllegalMonitorStateException("Блокировка чтения не удерживается: " + self.getName());
+        readers--;
+
+        if (held == 1)
+            readHolders.remove(self);
+        else
+            readHolders.put(self, held - 1);
+
+        if (readers == 0)
+            notifyAll();
     }
 
-    public void lockWrite() throws InterruptedException {
-        throw new UnsupportedOperationException("SYNC-03");
+    public synchronized void lockWrite() throws InterruptedException {
+        Thread self = Thread.currentThread();
+        waitingWriters++;
+        try {
+            while (writer != null || readers > 0) {
+                wait();
+            }
+            writer = self;
+        } finally {
+            waitingWriters--;
+            notifyAll();
+        }
     }
 
-    public void unlockWrite() {
-        throw new UnsupportedOperationException("SYNC-03");
+    public synchronized void unlockWrite() {
+        if (writer != Thread.currentThread())
+            throw new IllegalMonitorStateException(
+                    "Блокировка записи не удерживается: " + Thread.currentThread().getName());
+        writer = null;
+        notifyAll();
     }
 }
