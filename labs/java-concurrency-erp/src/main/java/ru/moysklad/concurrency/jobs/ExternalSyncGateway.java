@@ -45,7 +45,8 @@ public class ExternalSyncGateway {
             action.run();
             return true;
         } finally {
-            semaphore.release();
+            if (acquired)
+                semaphore.release();
         }
     }
 }

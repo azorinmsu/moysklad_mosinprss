@@ -9,9 +9,9 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ReportRefreshTask implements Runnable {
 
-    private boolean stopRequested;
+    private volatile boolean stopRequested;
     private final CountDownLatch started = new CountDownLatch(1);
-    private long cycles;
+    private volatile long cycles;
 
     @Override
     public void run() {

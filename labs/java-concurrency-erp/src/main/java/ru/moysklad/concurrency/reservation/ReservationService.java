@@ -35,7 +35,7 @@ public class ReservationService {
      * Успешных резервов не больше, чем доступный остаток.
      * Поле reserved совпадает с суммой количеств принятых резервов по этой позиции.
      */
-    public ReservationResult reserve(String orderId, String productId, String warehouseId, int quantity) {
+    public synchronized ReservationResult reserve(String orderId, String productId, String warehouseId, int quantity) {
         if (quantity <= 0) {
             throw new IllegalArgumentException("Количество резерва должно быть положительным");
         }

@@ -6,15 +6,15 @@ import ru.moysklad.concurrency.domain.InsufficientStockException;
 import ru.moysklad.concurrency.domain.StockBalance;
 import ru.moysklad.concurrency.support.SyncPoint;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class InventoryService {
 
     private final StockLedger ledger;
     private final SyncPoint syncPoint;
-    private final Map<String, Integer> balanceCache = new HashMap<>();
+    private final Map<String, Integer> balanceCache = new ConcurrentHashMap<>();
 
     @Autowired
     public InventoryService(StockLedger ledger) {
@@ -51,17 +51,15 @@ public class InventoryService {
      * Итоговое количество равно начальному минус сумма успешных списаний.
      */
     public void writeOff(String productId, String warehouseId, int quantity) {
-        if (quantity <= 0) {
+        if (quantity <= 0)
             throw new IllegalArgumentException("Списание должно быть положительным");
-        }
-        Object lock = new Object();
-        synchronized (lock) {
-            StockBalance stock = ledger.require(productId, warehouseId);
+
+        StockBalance stock = ledger.require(productId, warehouseId);
+        synchronized (stock) {
             int current = stock.getQuantity();
             syncPoint.rendezvous();
-            if (current < quantity) {
+            if (current < quantity)
                 throw new InsufficientStockException(productId, warehouseId, quantity, current);
-            }
             stock.setQuantity(current - quantity);
         }
     }
@@ -71,13 +69,15 @@ public class InventoryService {
      * Повторные увеличения одного ключа суммируются.
      */
     public void addCachedBalance(String productId, int delta) {
-        if (delta <= 0) {
+        if (delta <= 0)
             throw new IllegalArgumentException("Изменение кэша должно быть положительным");
-        }
-        Integer current = balanceCache.get(productId);
-        int base = current == null ? 0 : current;
-        syncPoint.rendezvous();
-        balanceCache.put(productId, base + delta);
+
+        // поменял на потокобезопасный хэшмап
+        balanceCache.compute(productId, (k, cur) -> {
+            int base = cur == null ? 0 : cur;
+            syncPoint.rendezvous();
+            return base + delta;
+        });
     }
 
     public int cachedBalance(String productId) {
