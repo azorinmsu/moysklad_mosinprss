@@ -1,0 +1,42 @@
+openapi: 3.1.0
+info:
+  title: Online Store API
+  version: 0.0.0-draft
+  summary: Публичное API интернет-магазина. Заполняет студент.
+  description: |
+    Каркас спецификации. В сдаче здесь описаны операции витрины и администратора.
+
+    Модель говорит языком магазина. Объекты Remap API (`meta`, `applicable`,
+    `assortment`, `syncId`, `customerorder`) в схемы и примеры не переносятся.
+    Преобразование выполняет интеграционный слой.
+
+    Для каждой операции нужны: параметры, тела, коды ответов, единый формат ошибки,
+    правило авторизации, правило идемпотентности, пример запроса и ответа.
+    Группы, которые должны появиться: Authentication, Catalog, Product, Cart,
+    Order, Payment, Return, Administration, Webhook.
+servers:
+  - url: https://shop.example.com/api
+    description: Учебный стенд, без боевых данных
+tags:
+  - name: Authentication
+    description: Регистрация и вход покупателя и администратора
+  - name: Catalog
+    description: Категории, поиск и выдача каталога из локальных данных
+  - name: Product
+    description: Карточка товара и модификации
+  - name: Cart
+    description: Корзина текущего покупателя
+  - name: Order
+    description: Оформление, история, статус, отмена
+  - name: Payment
+    description: Оплата через заглушку платёжной системы
+  - name: Return
+    description: Возврат товара и денег
+  - name: Administration
+    description: Операции администратора по заказам, отгрузке и возврату
+  - name: Webhook
+    description: Входящие уведомления внешних систем
+paths: {}
+components:
+  securitySchemes: {}
+  schemas: {}

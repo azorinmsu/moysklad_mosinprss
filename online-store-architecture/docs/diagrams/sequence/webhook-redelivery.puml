@@ -1,0 +1,6 @@
+@startuml
+title TODO: webhook redelivery
+' Требования к содержимому: docs/diagrams/sequence/README.md
+' В сдаче вместо этой заглушки должна быть диаграмма.
+' Готового решения в шаблоне нет намеренно.
+@enduml

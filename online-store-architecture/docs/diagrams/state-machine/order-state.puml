@@ -1,0 +1,6 @@
+@startuml
+title TODO: order state
+' Требования к содержимому: docs/diagrams/state-machine/README.md
+' В сдаче вместо этой заглушки должна быть диаграмма.
+' Готового решения в шаблоне нет намеренно.
+@enduml
