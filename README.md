@@ -12,6 +12,8 @@
 
 **Лабораторная «Многопоточность Java»:** отдельное приложение [labs/java-concurrency-erp](labs/java-concurrency-erp/README.md). Java 21, Spring Boot 3.5, in-memory ERP, без Docker. Модуль `intern` не меняется.
 
+**Учебное задание «Архитектура интернет-магазина с МойСклад»:** [online-store-architecture/README.md](online-store-architecture/README.md). Результат — архитектурная документация. Реализация магазина на этом этапе не входит в работу. Заглушка Remap API для режима `mock` уже собрана: [remap-stub/README.md](remap-stub/README.md), порт `8088`.
+
 Ниже — отдельное задание по `AggregateStock` / Sales.
 
 ---

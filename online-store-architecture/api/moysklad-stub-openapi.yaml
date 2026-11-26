@@ -1,29 +1,318 @@
 openapi: 3.1.0
 info:
   title: MoySklad Remap stub control API
-  version: 0.0.0-draft
-  summary: Управляющий API заглушки. Имитацию Remap API сюда не копировать.
+  version: 0.1.0
+  summary: Управляющий API предоставленной заглушки remap-stub.
   description: |
-    Каркас заполняет студент.
+    Только операции управления сценарием. Они лежат вне `/api/remap/1.2`.
+    Имитация Remap описана в `docs/integration/api-compatibility-matrix.md`
+    и в `remap-stub/README.md`.
 
-    Этот документ описывает только операции управления сценарием. Они лежат вне
-    префикса `/api/remap/1.2`. Имитируемые пути Remap перечисляются в
-    `docs/integration/api-compatibility-matrix.md` и ведут себя по официальной
-    документации.
-
-    В управляющем API должны найтись возможности: сброс состояния, загрузка
-    тестовых данных, искусственная задержка, ответы 429, 500 и 503, обрыв
-    соединения, таймаут, повторная доставка вебхука с тем же requestId,
-    доставка событий не по порядку, окно недоступности, успешное сохранение
-    документа без возврата HTTP-ответа клиенту интеграции.
-
+    Авторизации нет. Контракт учебный и не выставляется в публичную сеть.
     Секреты и адреса боевого аккаунта в примеры не входят.
 servers:
-  - url: http://moysklad-stub:8080
-    description: Процесс заглушки в учебном стенде
+  - url: http://localhost:8088
+    description: Процесс remap-stub по умолчанию
 tags:
   - name: Control
-    description: Управление состоянием и отказами, не часть Remap API
-paths: {}
+    description: Состояние, остатки и отказы
+  - name: Webhooks
+    description: Журнал и повтор доставки
+paths:
+  /api/stub/reset:
+    post:
+      tags: [Control]
+      operationId: resetStub
+      summary: Вернуть начальные данные и очистить сбои и журнал вебхуков
+      responses:
+        "200":
+          description: Состояние сброшено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /api/stub/seed:
+    post:
+      tags: [Control]
+      operationId: seedStub
+      summary: То же, что reset
+      responses:
+        "200":
+          description: Начальные данные загружены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /api/stub/faults:
+    get:
+      tags: [Control]
+      operationId: listFaults
+      summary: Текущие правила сбоев
+      responses:
+        "200":
+          description: Список правил
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FaultRule"
+    post:
+      tags: [Control]
+      operationId: addFault
+      summary: Добавить одно правило
+      description: |
+        `pathPattern` — шаблон Ant. Точный путь не покрывает вложенные ресурсы.
+        Для HTTP 429 код ошибки 1049, если `code` равен 0. Код 1073 задаётся явно.
+        `LOSE_RESPONSE` выполняет запрос и отдаёт пустое тело.
+        `TIMEOUT` и `CONNECTION_RESET` обработчик не вызывают.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaultRequest"
+            example:
+              method: POST
+              pathPattern: /api/remap/1.2/entity/customerorder
+              faultType: LOSE_RESPONSE
+              count: 1
+              httpStatus: 500
+              delayMs: 0
+              code: 0
+      responses:
+        "200":
+          description: Правило принято
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaultRule"
+    delete:
+      tags: [Control]
+      operationId: clearFaults
+      summary: Удалить правила и снять окно недоступности
+      responses:
+        "200":
+          description: Правила очищены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /api/stub/unavailable:
+    post:
+      tags: [Control]
+      operationId: setUnavailable
+      summary: Включить или выключить ответ 503 на все вызовы Remap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+              required: [enabled]
+      responses:
+        "200":
+          description: Режим переключён
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /api/stub/stock:
+    post:
+      tags: [Control]
+      operationId: putStock
+      summary: Записать абсолютные остаток, резерв и ожидание
+      description: Запись может разойтись с документами до следующего reset.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assortmentId:
+                  type: string
+                storeId:
+                  type: string
+                stock:
+                  type: number
+                reserve:
+                  type: number
+                inTransit:
+                  type: number
+              required: [assortmentId]
+      responses:
+        "200":
+          description: Строка остатка
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/stub/webhook-deliveries:
+    get:
+      tags: [Webhooks]
+      operationId: listWebhookDeliveries
+      summary: Журнал попыток доставки
+      responses:
+        "200":
+          description: Попытки с момента последнего reset
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WebhookDelivery"
+  /api/stub/webhooks/redeliver:
+    post:
+      tags: [Webhooks]
+      operationId: redeliverWebhook
+      summary: Повторить доставку с тем же requestId
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deliveryId:
+                  type: string
+              required: [deliveryId]
+      responses:
+        "200":
+          description: Новая попытка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "404":
+          description: Доставка не найдена
+  /api/stub/webhooks/disorder:
+    post:
+      tags: [Webhooks]
+      operationId: setWebhookDisorder
+      summary: Разворачивать пачку событий из двух и более элементов
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "200":
+          description: Режим порядка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /api/stub/webhooks/emit:
+    post:
+      tags: [Webhooks]
+      operationId: emitWebhook
+      summary: Отправить пачку событий на указанный URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                events:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      id:
+                        type: string
+                      action:
+                        type: string
+                    required: [type, id]
+              required: [url, events]
+      responses:
+        "200":
+          description: Попытка записана в журнал
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
 components:
-  schemas: {}
+  schemas:
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+    FaultRequest:
+      type: object
+      properties:
+        method:
+          type: string
+          default: GET
+        pathPattern:
+          type: string
+        faultType:
+          type: string
+          enum: [HTTP_STATUS, DELAY, TIMEOUT, CONNECTION_RESET, LOSE_RESPONSE]
+        httpStatus:
+          type: integer
+          default: 500
+        code:
+          type: integer
+          default: 0
+        delayMs:
+          type: integer
+          format: int64
+          default: 0
+        count:
+          type: integer
+          default: 1
+      required: [faultType]
+    FaultRule:
+      type: object
+      properties:
+        id:
+          type: string
+        method:
+          type: string
+        pathPattern:
+          type: string
+        type:
+          type: string
+        httpStatus:
+          type: integer
+        code:
+          type: integer
+        delayMs:
+          type: integer
+          format: int64
+        remaining:
+          type: integer
+    WebhookDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+        requestId:
+          type: string
+        url:
+          type: string
+        body:
+          type: string
+        status:
+          type: integer
+        error:
+          type: string
+          nullable: true
+        moment:
+          type: string
