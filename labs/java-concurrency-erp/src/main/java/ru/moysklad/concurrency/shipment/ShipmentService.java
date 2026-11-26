@@ -39,24 +39,30 @@ public class ShipmentService {
      * другие отгрузки могут выполняться.
      */
     public Shipment ship(String orderId, String productId, String warehouseId, int quantity) {
-        shipmentLock.lock();
-        if (quantity <= 0) {
+
+        if (quantity <= 0)
             throw new IllegalArgumentException("Пустая отгрузка");
+
+        try {
+            shipmentLock.lock();
+
+            StockBalance stock = ledger.require(productId, warehouseId);
+
+            if (stock.getQuantity() < quantity)
+                throw new InsufficientStockException(productId, warehouseId, quantity, stock.getQuantity());
+
+            stock.setQuantity(stock.getQuantity() - quantity);
+            return new Shipment(
+                    UUID.randomUUID().toString(),
+                    orderId,
+                    productId,
+                    warehouseId,
+                    quantity
+            );
+
+        } finally {
+            shipmentLock.unlock();
         }
-        StockBalance stock = ledger.require(productId, warehouseId);
-        if (stock.getQuantity() < quantity) {
-            throw new InsufficientStockException(productId, warehouseId, quantity, stock.getQuantity());
-        }
-        stock.setQuantity(stock.getQuantity() - quantity);
-        Shipment shipment = new Shipment(
-                UUID.randomUUID().toString(),
-                orderId,
-                productId,
-                warehouseId,
-                quantity
-        );
-        shipmentLock.unlock();
-        return shipment;
     }
 
     /**
@@ -65,12 +71,12 @@ public class ShipmentService {
      * Остаток наблюдаемого товара не уходит в минус.
      */
     public void shipWhenAvailable(int requested) throws InterruptedException {
-        if (requested <= 0) {
+        if (requested <= 0)
             throw new IllegalArgumentException("Количество отгрузки должно быть положительным");
-        }
+
         arrivalLock.lock();
         try {
-            if (incomingUnits < requested) {
+            while (incomingUnits < requested) { // здесь проблема if -> while
                 waitingForStock.countDown();
                 stockArrived.await();
             }

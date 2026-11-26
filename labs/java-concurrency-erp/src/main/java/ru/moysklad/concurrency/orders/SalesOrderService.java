@@ -62,10 +62,11 @@ public class SalesOrderService {
      * Итоговое значение равно числу вызовов для этого покупателя.
      */
     public void registerOrder(String customerId) {
-        Integer current = ordersByCustomer.get(customerId);
-        int next = (current == null ? 0 : current) + 1;
-        syncPoint.rendezvous();
-        ordersByCustomer.put(customerId, next);
+        ordersByCustomer.compute(customerId, (k, cur) -> {
+            int next = (cur == null ? 0 : cur) + 1; // check-then-act
+            syncPoint.rendezvous();
+            return next;
+        });
     }
 
     public int orderCount(String customerId) {

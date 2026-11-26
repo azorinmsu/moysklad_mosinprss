@@ -18,7 +18,11 @@ public class OrderEventProcessor {
 
     public void processOrder(String organization, String orderId) {
         organizationId.set(organization);
-        audit.add(organizationId.get() + ":" + orderId);
+        try {
+            audit.add(organizationId.get() + ":" + orderId);
+        } finally {
+            organizationId.remove();
+        }
     }
 
     public void runMaintenance() {

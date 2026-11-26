@@ -29,7 +29,7 @@ public class ReportService {
     private final ReentrantReadWriteLock turnoverLock = new ReentrantReadWriteLock();
     private final Map<String, Long> turnoverByWarehouse = new HashMap<>();
     private long turnoverTotal;
-    private final List<StockMovement> movements = new ArrayList<>();
+    private final List<StockMovement> movements = new CopyOnWriteArrayList<>();
 
     @Autowired
     public ReportService(StockLedger ledger) {
@@ -50,10 +50,9 @@ public class ReportService {
      * Итог равен сумме всех переданных сумм, в том числе при параллельных обновлениях.
      */
     public void recordTurnover(String warehouseId, long amount) {
-        if (amount < 0) {
+        if (amount < 0)
             throw new IllegalArgumentException("Оборот не может быть отрицательным");
-        }
-        turnoverLock.readLock().lock();
+        turnoverLock.writeLock().lock(); // здесь косячок
         try {
             long currentWarehouse = turnoverByWarehouse.getOrDefault(warehouseId, 0L);
             long currentTotal = turnoverTotal;
@@ -61,7 +60,7 @@ public class ReportService {
             turnoverByWarehouse.put(warehouseId, currentWarehouse + amount);
             turnoverTotal = currentTotal + amount;
         } finally {
-            turnoverLock.readLock().unlock();
+            turnoverLock.writeLock().unlock();
         }
     }
 
@@ -119,24 +118,21 @@ public class ReportService {
      * Метод завершается и возвращает сумму вкладов всех складов.
      */
     public int consolidatedTurnover(List<String> warehouseIds, Function<String, Integer> loader) throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(1, runnable -> {
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, warehouseIds.size()), runnable -> {
             Thread thread = new Thread(runnable, "consolidated-report");
             thread.setDaemon(true);
             return thread;
         });
         try {
-            CompletableFuture<Integer> report = CompletableFuture.supplyAsync(() -> {
-                int sum = 0;
-                for (String warehouseId : warehouseIds) {
-                    CompletableFuture<Integer> part = CompletableFuture.supplyAsync(
-                            () -> loader.apply(warehouseId),
-                            pool
-                    );
-                    sum += part.join();
-                }
-                return sum;
-            }, pool);
-            return report.get(2, TimeUnit.SECONDS);
+            List<CompletableFuture<Integer>> parts = warehouseIds.stream()
+                    .map(warehouseId -> CompletableFuture.supplyAsync(() -> loader.apply(warehouseId), pool))
+                    .toList();
+            CompletableFuture.allOf(parts.toArray(CompletableFuture[]::new)).get(2, TimeUnit.SECONDS);
+            int sum = 0;
+            for (CompletableFuture<Integer> part : parts) {
+                sum += part.join();
+            }
+            return sum;
         } finally {
             pool.shutdownNow();
             pool.awaitTermination(500, TimeUnit.MILLISECONDS);
@@ -167,9 +163,9 @@ public class ReportService {
                         balances.add(loader.apply(warehouseId));
                     } catch (RuntimeException ex) {
                         failed.add(warehouseId);
-                        return;
+                    } finally {
+                        latch.countDown();
                     }
-                    latch.countDown();
                 });
             }
             boolean completed = latch.await(1, TimeUnit.SECONDS);

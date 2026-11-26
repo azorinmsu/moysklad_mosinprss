@@ -16,7 +16,7 @@ public class PriceService {
 
     private final SyncPoint syncPoint;
     private final ConcurrentHashMap<String, Price> prices = new ConcurrentHashMap<>();
-    private PricePolicy published = initialPolicy();
+    private volatile PricePolicy published = initialPolicy();
 
     public PriceService() {
         this(SyncPoint.NOOP);
@@ -56,10 +56,10 @@ public class PriceService {
             throw new IllegalArgumentException("Наценка не может быть отрицательной");
         }
         PricePolicy policy = new PricePolicy();
+        policy.initialize(rules, margin);
         published = policy;
         syncPoint.signal("policy-published");
         syncPoint.awaitSignal("policy-observed", 2, TimeUnit.SECONDS);
-        policy.initialize(rules, margin);
     }
 
     public PricePolicy currentPolicy() {

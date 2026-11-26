@@ -25,26 +25,95 @@ import java.util.concurrent.TimeoutException;
  */
 public class CustomCyclicBarrier {
 
+    private final int parties;
+    private Generation generation = new Generation();
+
+    private static final class Generation {
+        private int count;
+        private boolean broken;
+    }
+
     public CustomCyclicBarrier(int parties) {
         if (parties <= 0) {
             throw new IllegalArgumentException("parties must be positive");
         }
+        this.parties = parties;
     }
 
-    public int await() throws InterruptedException, BrokenBarrierException {
-        throw new UnsupportedOperationException("SYNC-04");
+    public synchronized int await() throws InterruptedException, BrokenBarrierException {
+        Generation current = generation;
+        if (current.broken)
+            throw new BrokenBarrierException(); // поломался барьер и потоки не продолжат работать
+
+        int index = current.count++;
+        if (index == parties - 1) {
+            generation = new Generation();
+            notifyAll();
+            return 0;
+        }
+
+        try {
+            while (generation == current && !current.broken) {
+                wait();
+            }
+        } catch (InterruptedException exception) {
+            if (generation == current) {
+                current.broken = true;
+                notifyAll();
+            }
+            throw exception;
+        }
+
+        if (current.broken)
+            throw new BrokenBarrierException();
+        return parties - 1 - index;
     }
 
-    public int await(long timeout, TimeUnit unit)
+    public synchronized int await(long timeout, TimeUnit unit)
             throws InterruptedException, BrokenBarrierException, TimeoutException {
-        throw new UnsupportedOperationException("SYNC-04");
+        long remaining = unit.toNanos(timeout);
+        Generation current = generation;
+        if (current.broken)
+            throw new BrokenBarrierException();
+
+        int index = current.count++;
+        if (index == parties - 1) {
+            generation = new Generation();
+            notifyAll();
+            return 0;
+        }
+
+        try {
+            while (generation == current && !current.broken) {
+                if (remaining <= 0) {
+                    current.broken = true;
+                    notifyAll();
+                    throw new TimeoutException();
+                }
+                long started = System.nanoTime();
+                wait(remaining / 1_000_000L, (int) (remaining % 1_000_000L));
+                remaining -= System.nanoTime() - started;
+            }
+        } catch (InterruptedException exception) {
+            if (generation == current) {
+                current.broken = true;
+                notifyAll();
+            }
+            throw exception;
+        }
+
+        if (current.broken)
+            throw new BrokenBarrierException();
+        return parties - 1 - index;
     }
 
-    public void reset() {
-        throw new UnsupportedOperationException("SYNC-04");
+    public synchronized void reset() {
+        generation.broken = true;
+        generation = new Generation();
+        notifyAll();
     }
 
-    public int getNumberWaiting() {
-        throw new UnsupportedOperationException("SYNC-04");
+    public synchronized int getNumberWaiting() {
+        return generation.broken ? 0 : generation.count;
     }
 }
